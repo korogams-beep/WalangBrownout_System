@@ -1,0 +1,45 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: filter 0.12s ease, background 0.12s ease;
+}
+
+.primary {
+  background: var(--color-navy-900);
+  color: #fff;
+}
+
+.primary:hover {
+  filter: brightness(1.15);
+}
+
+.accent {
+  background: var(--color-amber);
+  color: var(--color-navy-950);
+}
+
+.accent:hover {
+  filter: brightness(1.06);
+}
+
+.secondary {
+  background: var(--color-surface);
+  color: var(--color-ink-600);
+  border-color: var(--color-border);
+}
+
+.secondary:hover {
+  border-color: var(--color-navy-400);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--color-ink-600);
+  border-color: var(--color-border);
+}
