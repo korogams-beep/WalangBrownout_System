@@ -53,3 +53,12 @@
   color: var(--color-red);
   font-weight: 700;
 }
+
+
+.summaryCard h3 {
+  color: #fff;
+}
+
+.summaryCard :global(.title) {
+  color: #fff;
+}
