@@ -3,21 +3,42 @@ import { useNavigate } from 'react-router-dom';
 import styles from './Login.module.css';
 import { BoltIcon } from '../components/ui/Icons.jsx';
 import Button from '../components/ui/Button.jsx';
+<<<<<<< HEAD
 import { useAuth } from '../context/AuthContext.jsx';
+=======
+import { useAuth, ROLE_HOME, ROLE_LABEL, ROLE_OPTIONS } from '../context/AuthContext.jsx';
+
+const ROLE_HINT = {
+  admin: 'Full access to every module.',
+  manager: 'Can view everything — on Transactions, can add new transactions and change status.',
+  staff: 'Can view everything — on Transactions, can only change status.',
+};
+>>>>>>> origin/role-based-access
 
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
+<<<<<<< HEAD
+=======
+  const [role, setRole] = useState('admin');
+>>>>>>> origin/role-based-access
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   function handleSubmit(e) {
     e.preventDefault();
     // Auth against Laravel/Sanctum is Module 2 scope — this build is frontend-only,
+<<<<<<< HEAD
     // so continuing just records who's "logged in" for the rest of the session
     // (see Settings) and takes the user into the app shell.
     login(username);
     navigate('/dashboard');
+=======
+    // so continuing just records who's "logged in" and their role for the rest
+    // of the session (see Settings) and takes them into the app shell.
+    login(username, role);
+    navigate(ROLE_HOME[role]);
+>>>>>>> origin/role-based-access
   }
 
   return (
@@ -29,6 +50,24 @@ export default function Login() {
         <h1 className={styles.title}>WalangBrownout Inventory System</h1>
         <p className={styles.subtitle}>Your distributor of home's comfort goods</p>
 
+<<<<<<< HEAD
+=======
+        <div className={styles.roleTabs} role="radiogroup" aria-label="Sign in as">
+          {ROLE_OPTIONS.map((r) => (
+            <button
+              key={r}
+              type="button"
+              role="radio"
+              aria-checked={role === r}
+              className={`${styles.roleTab} ${role === r ? styles.roleTabActive : ''}`}
+              onClick={() => setRole(r)}
+            >
+              {ROLE_LABEL[r]}
+            </button>
+          ))}
+        </div>
+
+>>>>>>> origin/role-based-access
         <input
           className={styles.input}
           type="text"
@@ -44,8 +83,15 @@ export default function Login() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
+<<<<<<< HEAD
         <Button type="submit" variant="accent" className={styles.submit}>
           Continue
+=======
+        <p className={styles.roleHint}>{ROLE_HINT[role]}</p>
+
+        <Button type="submit" variant="accent" className={styles.submit}>
+          Continue as {ROLE_LABEL[role]}
+>>>>>>> origin/role-based-access
         </Button>
       </form>
     </div>

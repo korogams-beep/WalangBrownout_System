@@ -1,21 +1,39 @@
 import { useMemo, useState } from 'react';
+<<<<<<< HEAD
 import { useNavigate } from 'react-router-dom';
+=======
+>>>>>>> origin/role-based-access
 import PageHeader from '../components/layout/PageHeader.jsx';
 import Card from '../components/ui/Card.jsx';
 import DataTable from '../components/ui/DataTable.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
 import Button from '../components/ui/Button.jsx';
+<<<<<<< HEAD
 import { useInventory } from '../context/InventoryContext.jsx';
+=======
+import TransactionDrawer from '../components/layout/TransactionDrawer.jsx';
+import { LockIcon } from '../components/ui/Icons.jsx';
+import { useInventory } from '../context/InventoryContext.jsx';
+import { usePermissions } from '../context/AuthContext.jsx';
+>>>>>>> origin/role-based-access
 import { TRANSACTION_TYPES, getNextStatus } from '../utils/inventoryLogic.js';
 import styles from './Transactions.module.css';
 
 const TYPE_FILTERS = ['All', ...TRANSACTION_TYPES];
 
 export default function Transactions() {
+<<<<<<< HEAD
   const navigate = useNavigate();
   const { transactions, products, advanceTransaction } = useInventory(); // shared log — updates the instant any page dispatches an action
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
+=======
+  const { transactions, products, advanceTransaction } = useInventory(); // shared log — updates the instant any page dispatches an action
+  const { canAddTransaction, canChangeTransactionStatus } = usePermissions();
+  const [query, setQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('All');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+>>>>>>> origin/role-based-access
 
   const rows = useMemo(() => {
     return transactions.map((t) => ({
@@ -78,6 +96,12 @@ export default function Transactions() {
               render: (r) => {
                 const next = getNextStatus(r.type, r.status);
                 if (!next) return null;
+<<<<<<< HEAD
+=======
+                // Admin, Manager, and Staff can all advance a transaction's
+                // status — this is the one action Staff is allowed to do.
+                if (!canChangeTransactionStatus) return null;
+>>>>>>> origin/role-based-access
                 return (
                   <Button variant="secondary" onClick={() => advanceTransaction(r.id)}>
                     Mark as {next}
@@ -89,11 +113,29 @@ export default function Transactions() {
         />
       </Card>
 
+<<<<<<< HEAD
       <div className={styles.actions}>
         <Button variant="accent" onClick={() => navigate('/transactions/new')}>
           New Transaction
         </Button>
       </div>
+=======
+      {/* Always shown so every role can see what the module offers — locked
+          instead of hidden for Staff, who can only change status. */}
+      <div className={styles.actions}>
+        <Button
+          variant="accent"
+          icon={canAddTransaction ? undefined : LockIcon}
+          disabled={!canAddTransaction}
+          title={canAddTransaction ? undefined : 'Restricted to Admin & Manager'}
+          onClick={() => canAddTransaction && setDrawerOpen(true)}
+        >
+          New Transaction
+        </Button>
+      </div>
+
+      {canAddTransaction && <TransactionDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />}
+>>>>>>> origin/role-based-access
     </div>
   );
 }
