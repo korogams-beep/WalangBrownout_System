@@ -54,8 +54,6 @@
   margin-bottom: 12px;
 }
 
-<<<<<<< HEAD
-=======
 .roleTabs {
   width: 100%;
   display: flex;
@@ -96,7 +94,6 @@
   min-height: 28px;
 }
 
->>>>>>> origin/role-based-access
 .input:focus {
   border-color: var(--color-amber);
 }

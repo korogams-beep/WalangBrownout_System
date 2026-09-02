@@ -1,10 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import styles from './Sidebar.module.css';
-<<<<<<< HEAD
-import { useAuth } from '../../context/AuthContext.jsx';
-=======
 import { useAuth, ROLE_LABEL } from '../../context/AuthContext.jsx';
->>>>>>> origin/role-based-access
 import {
   DashboardIcon,
   ProductIcon,
@@ -63,11 +59,7 @@ export default function Sidebar() {
         <span className={styles.avatar}>{initial}</span>
         <div className={styles.userText}>
           <p className={styles.userName}>{user?.username || 'Guest'}</p>
-<<<<<<< HEAD
-          <p className={styles.userRole}>{user?.role || 'Not signed in'}</p>
-=======
           <p className={styles.userRole}>{user ? ROLE_LABEL[user.role] : 'Not signed in'}</p>
->>>>>>> origin/role-based-access
         </div>
       </div>
 

@@ -118,8 +118,6 @@ export function BoltIcon(props) {
     </svg>
   );
 }
-<<<<<<< HEAD
-=======
 
 export function LockIcon(props) {
   return (
@@ -129,4 +127,3 @@ export function LockIcon(props) {
     </svg>
   );
 }
->>>>>>> origin/role-based-access

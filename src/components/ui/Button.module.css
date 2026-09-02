@@ -43,8 +43,6 @@
   color: var(--color-ink-600);
   border-color: var(--color-border);
 }
-<<<<<<< HEAD
-=======
 
 .btn:disabled {
   cursor: not-allowed;
@@ -55,4 +53,3 @@
 .btn:disabled:hover {
   filter: none;
 }
->>>>>>> origin/role-based-access

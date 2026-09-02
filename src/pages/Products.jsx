@@ -1,21 +1,12 @@
 import { useMemo, useState } from 'react';
-<<<<<<< HEAD
-import { useNavigate } from 'react-router-dom';
-=======
->>>>>>> origin/role-based-access
 import PageHeader from '../components/layout/PageHeader.jsx';
 import Card from '../components/ui/Card.jsx';
 import DataTable from '../components/ui/DataTable.jsx';
 import Button from '../components/ui/Button.jsx';
-<<<<<<< HEAD
-import { PlusIcon } from '../components/ui/Icons.jsx';
-import { useInventory } from '../context/InventoryContext.jsx';
-=======
 import ProductModal from '../components/layout/ProductModal.jsx';
 import { PlusIcon, LockIcon } from '../components/ui/Icons.jsx';
 import { useInventory } from '../context/InventoryContext.jsx';
 import { usePermissions } from '../context/AuthContext.jsx';
->>>>>>> origin/role-based-access
 import { getSoonestExpiringBatch, getLastUpdated } from '../utils/inventoryLogic.js';
 import styles from './ListPage.module.css';
 
@@ -23,16 +14,10 @@ import styles from './ListPage.module.css';
 // Category, Unit Price, Quantity On Hand, Quantity Committed, Warehouse Name,
 // Shelf Life, Expiry Date.
 export default function Products() {
-<<<<<<< HEAD
-  const navigate = useNavigate();
-  const { products, inventory, batches, transactions } = useInventory();
-  const [query, setQuery] = useState('');
-=======
   const { products, inventory, batches, transactions } = useInventory();
   const { canManageCatalog } = usePermissions();
   const [query, setQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
->>>>>>> origin/role-based-access
 
   const rows = useMemo(() => {
     return products.map((product) => {
@@ -96,12 +81,6 @@ export default function Products() {
       </Card>
 
       <div className={styles.footerAction}>
-<<<<<<< HEAD
-        <Button variant="accent" icon={PlusIcon} onClick={() => navigate('/products/new')}>
-          Add New Product
-        </Button>
-      </div>
-=======
         <Button
           variant="accent"
           icon={canManageCatalog ? PlusIcon : LockIcon}
@@ -114,7 +93,6 @@ export default function Products() {
       </div>
 
       {canManageCatalog && <ProductModal open={modalOpen} onClose={() => setModalOpen(false)} />}
->>>>>>> origin/role-based-access
     </div>
   );
 }

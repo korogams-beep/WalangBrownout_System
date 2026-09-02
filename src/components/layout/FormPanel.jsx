@@ -1,11 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import styles from './FormPanel.module.css';
 
-<<<<<<< HEAD
-export default function FormPanel({ title, children, footer, closeTo }) {
-  const navigate = useNavigate();
-
-=======
 export default function FormPanel({ title, children, footer, closeTo, onClose }) {
   const navigate = useNavigate();
 
@@ -17,21 +12,11 @@ export default function FormPanel({ title, children, footer, closeTo, onClose })
     navigate(closeTo || -1);
   }
 
->>>>>>> origin/role-based-access
   return (
     <div className={styles.panel}>
       <div className={styles.titleBar}>
         <h2 className={styles.title}>{title}</h2>
-<<<<<<< HEAD
-        <button
-          type="button"
-          className={styles.close}
-          aria-label="Close"
-          onClick={() => navigate(closeTo || -1)}
-        >
-=======
         <button type="button" className={styles.close} aria-label="Close" onClick={handleClose}>
->>>>>>> origin/role-based-access
           &times;
         </button>
       </div>

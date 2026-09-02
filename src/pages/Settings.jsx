@@ -4,23 +4,15 @@ import Card from '../components/ui/Card.jsx';
 import DataTable from '../components/ui/DataTable.jsx';
 import Button from '../components/ui/Button.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
-<<<<<<< HEAD
-import { UserIcon } from '../components/ui/Icons.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
-=======
 import { UserIcon, LockIcon } from '../components/ui/Icons.jsx';
 import { useAuth, usePermissions, ROLE_LABEL } from '../context/AuthContext.jsx';
->>>>>>> origin/role-based-access
 import { useInventory } from '../context/InventoryContext.jsx';
 import { generateReorderRule } from '../utils/inventoryLogic.js';
 import styles from './Settings.module.css';
 
 export default function Settings() {
   const { user, renameUser } = useAuth();
-<<<<<<< HEAD
-=======
   const { canManageCatalog } = usePermissions();
->>>>>>> origin/role-based-access
   const { products, reorderRules, addReorderRule, regenerateReorderRules } = useInventory();
 
   const [editingName, setEditingName] = useState(false);
@@ -94,11 +86,7 @@ export default function Settings() {
                     </button>
                   </p>
                   <p className={styles.accountMeta}>
-<<<<<<< HEAD
-                    {user.role} <StatusBadge status="Logged In" />
-=======
                     {ROLE_LABEL[user.role]} <StatusBadge status="Logged In" />
->>>>>>> origin/role-based-access
                   </p>
                   <p className={styles.accountMeta}>
                     Session started {new Date(user.loginTime).toLocaleString()}
@@ -125,9 +113,6 @@ export default function Settings() {
       <Card
         title="Automated Reorder Rules"
         action={
-<<<<<<< HEAD
-          <Button variant="secondary" onClick={regenerateReorderRules}>
-=======
           <Button
             variant="secondary"
             icon={canManageCatalog ? undefined : LockIcon}
@@ -135,7 +120,6 @@ export default function Settings() {
             title={canManageCatalog ? undefined : 'Restricted to Admin'}
             onClick={() => canManageCatalog && regenerateReorderRules()}
           >
->>>>>>> origin/role-based-access
             Recalculate All (current month)
           </Button>
         }
@@ -182,9 +166,6 @@ export default function Settings() {
                 </option>
               ))}
             </select>
-<<<<<<< HEAD
-            <Button variant="accent" disabled={!previewRule} onClick={handleSaveRule}>
-=======
             <Button
               variant="accent"
               icon={canManageCatalog ? undefined : LockIcon}
@@ -192,7 +173,6 @@ export default function Settings() {
               title={canManageCatalog ? undefined : 'Restricted to Admin'}
               onClick={() => canManageCatalog && handleSaveRule()}
             >
->>>>>>> origin/role-based-access
               Save Generated Rule
             </Button>
           </div>
