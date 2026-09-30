@@ -4,20 +4,23 @@ import Card from '../components/ui/Card.jsx';
 import DataTable from '../components/ui/DataTable.jsx';
 import Button from '../components/ui/Button.jsx';
 import ProductModal from '../components/layout/ProductModal.jsx';
-import { PlusIcon, LockIcon } from '../components/ui/Icons.jsx';
+import { PlusIcon, EditIcon, TrashIcon } from '../components/ui/Icons.jsx';
 import { useInventory } from '../context/InventoryContext.jsx';
 import { usePermissions } from '../context/AuthContext.jsx';
 import { getSoonestExpiringBatch, getLastUpdated } from '../utils/inventoryLogic.js';
 import styles from './ListPage.module.css';
+import productStyles from './Products.module.css';
 
-// Columns match the "UI Products" sheet exactly: Last Updated, Product Name,
-// Category, Unit Price, Quantity On Hand, Quantity Committed, Warehouse Name,
-// Shelf Life, Expiry Date.
 export default function Products() {
-  const { products, inventory, batches, transactions } = useInventory();
+  const { products, inventory, batches, transactions, deleteProduct } = useInventory();
   const { canManageCatalog } = usePermissions();
   const [query, setQuery] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
+
+  // Modal state — null = closed, 'add' = add mode, product object = edit mode
+  const [modalState, setModalState] = useState(null);
+
+  // Confirm-delete state — holds the product pending confirmation
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const rows = useMemo(() => {
     return products.map((product) => {
@@ -38,6 +41,15 @@ export default function Products() {
     if (!q) return rows;
     return rows.filter((p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
   }, [rows, query]);
+
+  function handleDeleteConfirm() {
+    if (deleteTarget) {
+      deleteProduct(deleteTarget.id);
+      setDeleteTarget(null);
+    }
+  }
+
+  const editTarget = modalState && modalState !== 'add' ? modalState : null;
 
   return (
     <div>
@@ -76,23 +88,82 @@ export default function Products() {
               header: 'Expiry Date',
               render: (r) => (r.expiryDate ? new Date(r.expiryDate).toLocaleDateString() : '—'),
             },
+            // Actions column — only rendered for Admin
+            ...(canManageCatalog
+              ? [
+                  {
+                    key: '_actions',
+                    header: 'Actions',
+                    align: 'right',
+                    render: (r) => (
+                      <span className={productStyles.rowActions}>
+                        <button
+                          type="button"
+                          className={productStyles.actionBtn}
+                          title="Edit product"
+                          onClick={() => setModalState(r)}
+                        >
+                          <EditIcon width={15} height={15} />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className={`${productStyles.actionBtn} ${productStyles.actionBtnDelete}`}
+                          title="Delete product"
+                          onClick={() => setDeleteTarget(r)}
+                        >
+                          <TrashIcon width={15} height={15} />
+                          Delete
+                        </button>
+                      </span>
+                    ),
+                  },
+                ]
+              : []),
           ]}
         />
       </Card>
 
-      <div className={styles.footerAction}>
-        <Button
-          variant="accent"
-          icon={canManageCatalog ? PlusIcon : LockIcon}
-          disabled={!canManageCatalog}
-          title={canManageCatalog ? undefined : 'Restricted to Admin'}
-          onClick={() => canManageCatalog && setModalOpen(true)}
-        >
-          Add New Product
-        </Button>
-      </div>
+      {/* Add Product button — visible to Admin only */}
+      {canManageCatalog && (
+        <div className={styles.footerAction}>
+          <Button
+            variant="accent"
+            icon={PlusIcon}
+            onClick={() => setModalState('add')}
+          >
+            Add New Product
+          </Button>
+        </div>
+      )}
 
-      {canManageCatalog && <ProductModal open={modalOpen} onClose={() => setModalOpen(false)} />}
+      {/* Add / Edit modal */}
+      <ProductModal
+        open={modalState !== null}
+        onClose={() => setModalState(null)}
+        editProduct={editTarget}
+      />
+
+      {/* Delete confirmation dialog */}
+      {deleteTarget && (
+        <div className={productStyles.deleteOverlay} onClick={() => setDeleteTarget(null)}>
+          <div className={productStyles.deleteDialog} onClick={(e) => e.stopPropagation()}>
+            <h3 className={productStyles.deleteTitle}>Delete Product?</h3>
+            <p className={productStyles.deleteBody}>
+              <strong>{deleteTarget.name}</strong> ({deleteTarget.id}) will be permanently removed
+              from the catalog, along with its batches and reorder rule. This cannot be undone.
+            </p>
+            <div className={productStyles.deleteFooter}>
+              <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleDeleteConfirm}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

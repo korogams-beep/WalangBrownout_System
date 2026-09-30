@@ -1,0 +1,78 @@
+/* Inline Edit / Delete action buttons per product row */
+.rowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-600);
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+  white-space: nowrap;
+}
+
+.actionBtn:hover {
+  border-color: var(--color-navy-400);
+  color: var(--color-navy-900);
+}
+
+.actionBtnDelete {
+  color: #c03030;
+  border-color: #f5c0c0;
+}
+
+.actionBtnDelete:hover {
+  background: #fff0f0;
+  border-color: #d04040;
+  color: #a02020;
+}
+
+/* Delete confirmation overlay + dialog */
+.deleteOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+.deleteDialog {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.4);
+  padding: 28px 32px 24px;
+  max-width: 420px;
+  width: 100%;
+}
+
+.deleteTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-ink-900);
+  margin-bottom: 12px;
+}
+
+.deleteBody {
+  font-size: 13.5px;
+  color: var(--color-ink-600);
+  line-height: 1.5;
+  margin-bottom: 22px;
+}
+
+.deleteFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

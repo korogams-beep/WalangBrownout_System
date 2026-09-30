@@ -5,7 +5,6 @@ import DataTable from '../components/ui/DataTable.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
 import Button from '../components/ui/Button.jsx';
 import TransactionDrawer from '../components/layout/TransactionDrawer.jsx';
-import { LockIcon } from '../components/ui/Icons.jsx';
 import { useInventory } from '../context/InventoryContext.jsx';
 import { usePermissions } from '../context/AuthContext.jsx';
 import { TRANSACTION_TYPES, getNextStatus } from '../utils/inventoryLogic.js';
@@ -95,19 +94,17 @@ export default function Transactions() {
         />
       </Card>
 
-      {/* Always shown so every role can see what the module offers — locked
-          instead of hidden for Staff, who can only change status. */}
-      <div className={styles.actions}>
-        <Button
-          variant="accent"
-          icon={canAddTransaction ? undefined : LockIcon}
-          disabled={!canAddTransaction}
-          title={canAddTransaction ? undefined : 'Restricted to Admin & Manager'}
-          onClick={() => canAddTransaction && setDrawerOpen(true)}
-        >
-          New Transaction
-        </Button>
-      </div>
+      {/* Only Admin and Manager can create transactions — hidden entirely for Staff */}
+      {canAddTransaction && (
+        <div className={styles.actions}>
+          <Button
+            variant="accent"
+            onClick={() => setDrawerOpen(true)}
+          >
+            New Transaction
+          </Button>
+        </div>
+      )}
 
       {canAddTransaction && <TransactionDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />}
     </div>

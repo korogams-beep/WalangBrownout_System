@@ -5,73 +5,190 @@ import { BoltIcon } from '../components/ui/Icons.jsx';
 import Button from '../components/ui/Button.jsx';
 import { useAuth, ROLE_HOME, ROLE_LABEL, ROLE_OPTIONS } from '../context/AuthContext.jsx';
 
-const ROLE_HINT = {
-  admin: 'Full access to every module.',
-  manager: 'Can view everything — on Transactions, can add new transactions and change status.',
-  staff: 'Can view everything — on Transactions, can only change status.',
-};
-
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const [role, setRole] = useState('admin');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const { login, register } = useAuth();
 
-  function handleSubmit(e) {
+  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
+  // Sign-in fields — isolated state
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Sign-up fields — isolated state
+  const [regUsername, setRegUsername] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [regRole, setRegRole] = useState('staff');
+
+  function handleLogin(e) {
     e.preventDefault();
-    // Auth against Laravel/Sanctum is Module 2 scope — this build is frontend-only,
-    // so continuing just records who's "logged in" and their role for the rest
-    // of the session (see Settings) and takes them into the app shell.
-    login(username, role);
-    navigate(ROLE_HOME[role]);
+    setError('');
+    const result = login(loginUsername, loginPassword);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    navigate(ROLE_HOME[result.role] ?? '/dashboard');
+  }
+
+  function handleRegister(e) {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+    if (regPassword !== regConfirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    const result = register(regUsername, regPassword, regRole);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    setSuccessMsg(`Account "${regUsername}" created! You can now sign in.`);
+    // Clear sign-up fields and switch to sign-in
+    setRegUsername('');
+    setRegPassword('');
+    setRegConfirmPassword('');
+    setRegRole('staff');
+    setMode('login');
+  }
+
+  function switchMode(m) {
+    setMode(m);
+    setError('');
+    setSuccessMsg('');
+    // Clear both forms when switching so nothing bleeds across
+    setLoginUsername('');
+    setLoginPassword('');
+    setRegUsername('');
+    setRegPassword('');
+    setRegConfirmPassword('');
+    setRegRole('staff');
   }
 
   return (
     <div className={styles.page}>
-      <form className={styles.card} onSubmit={handleSubmit}>
+      <div className={styles.card}>
         <div className={styles.logo}>
           <BoltIcon width={26} height={26} />
         </div>
         <h1 className={styles.title}>WalangBrownout Inventory System</h1>
         <p className={styles.subtitle}>Your distributor of home's comfort goods</p>
 
-        <div className={styles.roleTabs} role="radiogroup" aria-label="Sign in as">
-          {ROLE_OPTIONS.map((r) => (
-            <button
-              key={r}
-              type="button"
-              role="radio"
-              aria-checked={role === r}
-              className={`${styles.roleTab} ${role === r ? styles.roleTabActive : ''}`}
-              onClick={() => setRole(r)}
-            >
-              {ROLE_LABEL[r]}
-            </button>
-          ))}
+        {/* Mode toggle */}
+        <div className={styles.modeTabs}>
+          <button
+            type="button"
+            className={`${styles.modeTab} ${mode === 'login' ? styles.modeTabActive : ''}`}
+            onClick={() => switchMode('login')}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            className={`${styles.modeTab} ${mode === 'register' ? styles.modeTabActive : ''}`}
+            onClick={() => switchMode('register')}
+          >
+            Sign Up
+          </button>
         </div>
 
-        <input
-          className={styles.input}
-          type="text"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <input
-          className={styles.input}
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        {successMsg && <p className={styles.successMsg}>{successMsg}</p>}
+        {error && <p className={styles.errorMsg}>{error}</p>}
 
-        <p className={styles.roleHint}>{ROLE_HINT[role]}</p>
+        {mode === 'login' ? (
+          <form className={styles.form} onSubmit={handleLogin}>
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="Username"
+              value={loginUsername}
+              onChange={(e) => setLoginUsername(e.target.value)}
+              required
+              autoComplete="username"
+            />
+            <input
+              className={styles.input}
+              type="password"
+              placeholder="Password"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+            <Button type="submit" variant="accent" className={styles.submit}>
+              Sign In
+            </Button>
+            <p className={styles.switchHint}>
+              Don't have an account?{' '}
+              <button type="button" className={styles.switchLink} onClick={() => switchMode('register')}>
+                Sign Up
+              </button>
+            </p>
+          </form>
+        ) : (
+          <form className={styles.form} onSubmit={handleRegister}>
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="Username"
+              value={regUsername}
+              onChange={(e) => setRegUsername(e.target.value)}
+              required
+              autoComplete="off"
+            />
+            <input
+              className={styles.input}
+              type="password"
+              placeholder="Password"
+              value={regPassword}
+              onChange={(e) => setRegPassword(e.target.value)}
+              required
+              autoComplete="new-password"
+            />
+            <input
+              className={styles.input}
+              type="password"
+              placeholder="Confirm Password"
+              value={regConfirmPassword}
+              onChange={(e) => setRegConfirmPassword(e.target.value)}
+              required
+              autoComplete="new-password"
+            />
 
-        <Button type="submit" variant="accent" className={styles.submit}>
-          Continue as {ROLE_LABEL[role]}
-        </Button>
-      </form>
+            <div className={styles.roleSelect}>
+              <label className={styles.roleLabel} htmlFor="reg-role">
+                Role
+              </label>
+              <select
+                id="reg-role"
+                className={styles.roleDropdown}
+                value={regRole}
+                onChange={(e) => setRegRole(e.target.value)}
+              >
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABEL[r]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Button type="submit" variant="accent" className={styles.submit}>
+              Create Account
+            </Button>
+            <p className={styles.switchHint}>
+              Already have an account?{' '}
+              <button type="button" className={styles.switchLink} onClick={() => switchMode('login')}>
+                Sign In
+              </button>
+            </p>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
