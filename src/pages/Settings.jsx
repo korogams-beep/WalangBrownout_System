@@ -4,19 +4,33 @@ import Card from '../components/ui/Card.jsx';
 import DataTable from '../components/ui/DataTable.jsx';
 import Button from '../components/ui/Button.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
-import { UserIcon, LockIcon } from '../components/ui/Icons.jsx';
+import { UserIcon, LockIcon, PlusIcon, EditIcon, TrashIcon } from '../components/ui/Icons.jsx';
 import { useAuth, usePermissions, ROLE_LABEL } from '../context/AuthContext.jsx';
 import { useInventory } from '../context/InventoryContext.jsx';
 import { generateReorderRule } from '../utils/inventoryLogic.js';
 import styles from './Settings.module.css';
 
+const emptySupplier = { name: '', contactPerson: '', phone: '', email: '', address: '' };
+
 export default function Settings() {
   const { user, renameUser } = useAuth();
-  const { canManageCatalog } = usePermissions();
-  const { products, reorderRules, addReorderRule, regenerateReorderRules } = useInventory();
+  const { canManageCatalog, isAdmin } = usePermissions();
+  const {
+    products,
+    reorderRules,
+    addReorderRule,
+    regenerateReorderRules,
+    suppliers,
+    addSupplier,
+    editSupplier,
+    deleteSupplier,
+  } = useInventory();
 
+  // ── Account ────────────────────────────────────────────────────────────
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(user?.username || '');
+
+  // ── Reorder rules ──────────────────────────────────────────────────────
   const [generatorProductId, setGeneratorProductId] = useState('');
 
   const rules = useMemo(() => {
@@ -26,14 +40,59 @@ export default function Settings() {
     }));
   }, [reorderRules, products]);
 
-  // Every product already gets a rule the moment it's added (see
-  // ProductForm / InventoryContext), so this list is normally empty — it
-  // only matters if a rule was ever removed, or for re-previewing one.
   const unconfiguredProducts = products.filter((p) => !reorderRules.some((r) => r.productId === p.id));
 
   const previewProduct = products.find((p) => p.id === generatorProductId);
-  const previewRule = previewProduct ? generateReorderRule(previewProduct, { id: `ROZ-${previewProduct.id.replace('PID-', '')}` }) : null;
+  const previewRule = previewProduct
+    ? generateReorderRule(previewProduct, { id: `ROZ-${previewProduct.id.replace('PID-', '')}` })
+    : null;
 
+  // ── Supplier management ────────────────────────────────────────────────
+  // supplierModal: null = closed | 'add' | supplier-object (edit)
+  const [supplierModal, setSupplierModal] = useState(null);
+  const [supplierForm, setSupplierForm] = useState(emptySupplier);
+  const [supplierError, setSupplierError] = useState('');
+  const [deleteSupplierTarget, setDeleteSupplierTarget] = useState(null);
+
+  function openAddSupplier() {
+    setSupplierForm(emptySupplier);
+    setSupplierError('');
+    setSupplierModal('add');
+  }
+
+  function openEditSupplier(s) {
+    setSupplierForm({ name: s.name, contactPerson: s.contactPerson, phone: s.phone, email: s.email, address: s.address });
+    setSupplierError('');
+    setSupplierModal(s);
+  }
+
+  function updateSupplierForm(field, value) {
+    setSupplierForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleSupplierSubmit(e) {
+    e.preventDefault();
+    setSupplierError('');
+    if (!supplierForm.name.trim()) {
+      setSupplierError('Supplier name is required.');
+      return;
+    }
+    if (supplierModal === 'add') {
+      addSupplier({ ...supplierForm });
+    } else {
+      editSupplier({ ...supplierModal, ...supplierForm });
+    }
+    setSupplierModal(null);
+  }
+
+  function handleDeleteSupplierConfirm() {
+    if (deleteSupplierTarget) {
+      deleteSupplier(deleteSupplierTarget.id);
+      setDeleteSupplierTarget(null);
+    }
+  }
+
+  // ── Handlers ───────────────────────────────────────────────────────────
   function handleSaveName(e) {
     e.preventDefault();
     renameUser(nameDraft);
@@ -48,8 +107,9 @@ export default function Settings() {
 
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Account and automated reorder rules" />
+      <PageHeader title="Settings" subtitle="Account, suppliers, and automated reorder rules" />
 
+      {/* ── Account ─────────────────────────────────────────────────── */}
       <Card title="Account" className={styles.accountCard}>
         {user ? (
           <div className={styles.accountRow}>
@@ -63,12 +123,8 @@ export default function Settings() {
                     onChange={(e) => setNameDraft(e.target.value)}
                     autoFocus
                   />
-                  <Button type="submit" variant="accent">
-                    Save
-                  </Button>
-                  <Button type="button" variant="secondary" onClick={() => setEditingName(false)}>
-                    Cancel
-                  </Button>
+                  <Button type="submit" variant="accent">Save</Button>
+                  <Button type="button" variant="secondary" onClick={() => setEditingName(false)}>Cancel</Button>
                 </form>
               ) : (
                 <>
@@ -77,10 +133,7 @@ export default function Settings() {
                     <button
                       type="button"
                       className={styles.editLink}
-                      onClick={() => {
-                        setNameDraft(user.username);
-                        setEditingName(true);
-                      }}
+                      onClick={() => { setNameDraft(user.username); setEditingName(true); }}
                     >
                       Edit
                     </button>
@@ -97,19 +150,74 @@ export default function Settings() {
           </div>
         ) : (
           <div className={styles.accountRow}>
-            <span className={styles.avatarLg}>
-              <UserIcon width={20} height={20} />
-            </span>
+            <span className={styles.avatarLg}><UserIcon width={20} height={20} /></span>
             <div className={styles.accountInfo}>
               <p className={styles.accountName}>Guest</p>
-              <p className={styles.accountMeta}>
-                Not signed in <StatusBadge status="No" />
-              </p>
+              <p className={styles.accountMeta}>Not signed in <StatusBadge status="No" /></p>
             </div>
           </div>
         )}
       </Card>
 
+      {/* ── Supplier Management — Admin only ────────────────────────── */}
+      {isAdmin && (
+        <Card
+          title="Supplier Management"
+          className={styles.supplierCard}
+          action={
+            <Button variant="accent" icon={PlusIcon} onClick={openAddSupplier}>
+              Add Supplier
+            </Button>
+          }
+        >
+          <p className={styles.helperText}>
+            Manage the suppliers that provide products to this inventory. Only Admins can view and
+            edit this section.
+          </p>
+          <DataTable
+            rowKey="id"
+            rows={suppliers}
+            emptyMessage="No suppliers yet — add one above."
+            columns={[
+              { key: 'id', header: 'Supplier ID' },
+              { key: 'name', header: 'Supplier Name' },
+              { key: 'contactPerson', header: 'Contact Person' },
+              { key: 'phone', header: 'Phone' },
+              { key: 'email', header: 'Email' },
+              { key: 'address', header: 'Address' },
+              {
+                key: '_actions',
+                header: 'Actions',
+                align: 'right',
+                render: (s) => (
+                  <span className={styles.supplierActions}>
+                    <button
+                      type="button"
+                      className={styles.supplierActionBtn}
+                      title="Edit supplier"
+                      onClick={() => openEditSupplier(s)}
+                    >
+                      <EditIcon width={14} height={14} />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.supplierActionBtn} ${styles.supplierActionBtnDelete}`}
+                      title="Delete supplier"
+                      onClick={() => setDeleteSupplierTarget(s)}
+                    >
+                      <TrashIcon width={14} height={14} />
+                      Delete
+                    </button>
+                  </span>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      )}
+
+      {/* ── Automated Reorder Rules ──────────────────────────────────── */}
       <Card
         title="Automated Reorder Rules"
         action={
@@ -161,9 +269,7 @@ export default function Settings() {
             >
               <option value="">Select a product…</option>
               {unconfiguredProducts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.id})
-                </option>
+                <option key={p.id} value={p.id}>{p.name} ({p.id})</option>
               ))}
             </select>
             <Button
@@ -179,39 +285,107 @@ export default function Settings() {
 
           {previewRule && (
             <div className={styles.previewGrid}>
-              <div>
-                <span className={styles.previewLabel}>Class</span>
-                <StatusBadge status={previewRule.productClass} />
-              </div>
-              <div>
-                <span className={styles.previewLabel}>Review Cycle</span>
-                <span>{previewRule.reviewCycle}</span>
-              </div>
+              <div><span className={styles.previewLabel}>Class</span><StatusBadge status={previewRule.productClass} /></div>
+              <div><span className={styles.previewLabel}>Review Cycle</span><span>{previewRule.reviewCycle}</span></div>
               <div>
                 <span className={styles.previewLabel}>Season</span>
                 <span>{previewRule.seasonStart ? `${previewRule.seasonStart} – ${previewRule.seasonEnd}` : 'Non-seasonal'}</span>
               </div>
-              <div>
-                <span className={styles.previewLabel}>Avg Daily Usage</span>
-                <span>{previewRule.avgDailyUsage}</span>
-              </div>
-              <div>
-                <span className={styles.previewLabel}>Lead Time</span>
-                <span>{previewRule.leadTimeDays} days</span>
-              </div>
-              <div>
-                <span className={styles.previewLabel}>Safety Stock</span>
-                <span>{previewRule.safetyStock}</span>
-              </div>
-              <div>
-                <span className={styles.previewLabel}>Reorder Point</span>
-                <span>
-                  <strong>{previewRule.rop}</strong>
-                </span>
-              </div>
+              <div><span className={styles.previewLabel}>Avg Daily Usage</span><span>{previewRule.avgDailyUsage}</span></div>
+              <div><span className={styles.previewLabel}>Lead Time</span><span>{previewRule.leadTimeDays} days</span></div>
+              <div><span className={styles.previewLabel}>Safety Stock</span><span>{previewRule.safetyStock}</span></div>
+              <div><span className={styles.previewLabel}>Reorder Point</span><span><strong>{previewRule.rop}</strong></span></div>
             </div>
           )}
         </Card>
+      )}
+
+      {/* ── Add / Edit Supplier modal ────────────────────────────────── */}
+      {supplierModal !== null && (
+        <div className={styles.modalOverlay} onClick={() => setSupplierModal(null)}>
+          <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>
+              {supplierModal === 'add' ? 'Add Supplier' : 'Edit Supplier'}
+            </h3>
+            {supplierError && <p className={styles.modalError}>{supplierError}</p>}
+            <form onSubmit={handleSupplierSubmit}>
+              <div className={styles.modalGrid}>
+                <label className={styles.modalLabel}>
+                  Supplier Name <span className={styles.required}>*</span>
+                  <input
+                    className={styles.modalInput}
+                    value={supplierForm.name}
+                    onChange={(e) => updateSupplierForm('name', e.target.value)}
+                    placeholder="e.g. CoolAire Distributors"
+                    required
+                  />
+                </label>
+                <label className={styles.modalLabel}>
+                  Contact Person
+                  <input
+                    className={styles.modalInput}
+                    value={supplierForm.contactPerson}
+                    onChange={(e) => updateSupplierForm('contactPerson', e.target.value)}
+                    placeholder="e.g. Juan dela Cruz"
+                  />
+                </label>
+                <label className={styles.modalLabel}>
+                  Phone
+                  <input
+                    className={styles.modalInput}
+                    value={supplierForm.phone}
+                    onChange={(e) => updateSupplierForm('phone', e.target.value)}
+                    placeholder="e.g. 09171234567"
+                  />
+                </label>
+                <label className={styles.modalLabel}>
+                  Email
+                  <input
+                    className={styles.modalInput}
+                    type="email"
+                    value={supplierForm.email}
+                    onChange={(e) => updateSupplierForm('email', e.target.value)}
+                    placeholder="e.g. supplier@email.com"
+                  />
+                </label>
+                <label className={`${styles.modalLabel} ${styles.modalLabelFull}`}>
+                  Address
+                  <input
+                    className={styles.modalInput}
+                    value={supplierForm.address}
+                    onChange={(e) => updateSupplierForm('address', e.target.value)}
+                    placeholder="e.g. Quezon City, Metro Manila"
+                  />
+                </label>
+              </div>
+              <div className={styles.modalFooter}>
+                <Button type="button" variant="secondary" onClick={() => setSupplierModal(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="accent">
+                  {supplierModal === 'add' ? 'Save Supplier' : 'Save Changes'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Supplier confirmation ─────────────────────────────── */}
+      {deleteSupplierTarget && (
+        <div className={styles.modalOverlay} onClick={() => setDeleteSupplierTarget(null)}>
+          <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Delete Supplier?</h3>
+            <p className={styles.modalBody}>
+              <strong>{deleteSupplierTarget.name}</strong> ({deleteSupplierTarget.id}) will be
+              permanently removed. This cannot be undone.
+            </p>
+            <div className={styles.modalFooter}>
+              <Button variant="secondary" onClick={() => setDeleteSupplierTarget(null)}>Cancel</Button>
+              <Button variant="danger" onClick={handleDeleteSupplierConfirm}>Delete</Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

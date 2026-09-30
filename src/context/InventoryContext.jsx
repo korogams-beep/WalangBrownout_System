@@ -14,6 +14,10 @@ const InventoryContext = createContext(null);
 
 let nextTxnId = 1;
 let nextBatchId = 1;
+let nextSupplierId = 1;
+function makeSupplierId() {
+  return `SUP-${String(nextSupplierId++).padStart(3, '0')}`;
+}
 function makeTransactionId() {
   return `T-${String(nextTxnId++).padStart(3, '0')}`;
 }
@@ -124,7 +128,13 @@ function buildInitialState() {
     reorderRules.push(generateReorderRule(product, { id: makeRuleId(product.id) }));
   });
 
-  return { products, reorderRules, inventory, batches, transactions };
+  // Seed suppliers
+  const suppliers = [
+    { id: makeSupplierId(), name: 'CoolAire Distributors', contactPerson: 'Juan dela Cruz', phone: '09171234567', email: 'juan@coolairedist.com', address: 'Quezon City, Metro Manila' },
+    { id: makeSupplierId(), name: 'PureBreeze Supply Co.', contactPerson: 'Maria Santos', phone: '09281234567', email: 'maria@purebreeze.ph', address: 'Cebu City, Cebu' },
+  ];
+
+  return { products, reorderRules, inventory, batches, transactions, suppliers };
 }
 
 function reducer(state, action) {
@@ -180,6 +190,36 @@ function reducer(state, action) {
         batches: newBatches,
         transactions: startingQty > 0 ? [txn, ...state.transactions] : state.transactions,
         reorderRules: [...state.reorderRules, rule],
+      };
+    }
+
+    case 'DELETE_PRODUCT': {
+      const { productId } = action.payload;
+      const newInventory = { ...state.inventory };
+      delete newInventory[productId];
+      return {
+        ...state,
+        products: state.products.filter((p) => p.id !== productId),
+        inventory: newInventory,
+        batches: state.batches.filter((b) => b.productId !== productId),
+        transactions: state.transactions.filter((t) => t.productId !== productId),
+        reorderRules: state.reorderRules.filter((r) => r.productId !== productId),
+      };
+    }
+
+    case 'EDIT_PRODUCT': {
+      const { product } = action.payload;
+      const updated = {
+        ...product,
+        productClass: classifyProduct(product),
+        seasonal: isSeasonal(product),
+      };
+      // Regenerate reorder rule to reflect any classification changes.
+      const rule = generateReorderRule(updated, { id: makeRuleId(updated.id) });
+      return {
+        ...state,
+        products: state.products.map((p) => (p.id === updated.id ? updated : p)),
+        reorderRules: state.reorderRules.map((r) => (r.productId === updated.id ? rule : r)),
       };
     }
 
@@ -254,6 +294,24 @@ function reducer(state, action) {
       };
     }
 
+    case 'ADD_SUPPLIER': {
+      const { supplier } = action.payload;
+      return { ...state, suppliers: [...state.suppliers, { ...supplier, id: makeSupplierId() }] };
+    }
+
+    case 'EDIT_SUPPLIER': {
+      const { supplier } = action.payload;
+      return {
+        ...state,
+        suppliers: state.suppliers.map((s) => (s.id === supplier.id ? { ...s, ...supplier } : s)),
+      };
+    }
+
+    case 'DELETE_SUPPLIER': {
+      const { supplierId } = action.payload;
+      return { ...state, suppliers: state.suppliers.filter((s) => s.id !== supplierId) };
+    }
+
     default:
       return state;
   }
@@ -265,10 +323,15 @@ export function InventoryProvider({ children }) {
   const actions = useMemo(
     () => ({
       addProduct: (product) => dispatch({ type: 'ADD_PRODUCT', payload: { product } }),
+      deleteProduct: (productId) => dispatch({ type: 'DELETE_PRODUCT', payload: { productId } }),
+      editProduct: (product) => dispatch({ type: 'EDIT_PRODUCT', payload: { product } }),
       addReorderRule: (rule) => dispatch({ type: 'ADD_REORDER_RULE', payload: { rule } }),
       regenerateReorderRules: () => dispatch({ type: 'REGENERATE_REORDER_RULES' }),
       createTransaction: (payload) => dispatch({ type: 'CREATE_TRANSACTION', payload }),
       advanceTransaction: (transactionId) => dispatch({ type: 'ADVANCE_TRANSACTION', payload: { transactionId } }),
+      addSupplier: (supplier) => dispatch({ type: 'ADD_SUPPLIER', payload: { supplier } }),
+      editSupplier: (supplier) => dispatch({ type: 'EDIT_SUPPLIER', payload: { supplier } }),
+      deleteSupplier: (supplierId) => dispatch({ type: 'DELETE_SUPPLIER', payload: { supplierId } }),
     }),
     []
   );
