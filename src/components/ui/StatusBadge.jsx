@@ -24,6 +24,8 @@ const STATUS_TONE = {
   'Yes': 'yellow',
   'No': 'green',
   'Logged In': 'green',
+  'Active': 'green',
+  'Inactive': 'red',
 };
 
 export default function StatusBadge({ status }) {

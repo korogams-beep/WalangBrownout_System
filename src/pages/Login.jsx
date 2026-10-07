@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import styles from './Login.module.css';
 import { BoltIcon } from '../components/ui/Icons.jsx';
 import Button from '../components/ui/Button.jsx';
-import { useAuth, ROLE_HOME, ROLE_LABEL, ROLE_OPTIONS } from '../context/AuthContext.jsx';
+import { useAuth, ROLE_HOME } from '../context/AuthContext.jsx';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -21,7 +21,6 @@ export default function Login() {
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
-  const [regRole, setRegRole] = useState('staff');
 
   function handleLogin(e) {
     e.preventDefault();
@@ -42,7 +41,7 @@ export default function Login() {
       setError('Passwords do not match.');
       return;
     }
-    const result = register(regUsername, regPassword, regRole);
+    const result = register(regUsername, regPassword, 'staff');
     if (!result.ok) {
       setError(result.message);
       return;
@@ -52,7 +51,6 @@ export default function Login() {
     setRegUsername('');
     setRegPassword('');
     setRegConfirmPassword('');
-    setRegRole('staff');
     setMode('login');
   }
 
@@ -66,7 +64,6 @@ export default function Login() {
     setRegUsername('');
     setRegPassword('');
     setRegConfirmPassword('');
-    setRegRole('staff');
   }
 
   return (
@@ -158,24 +155,6 @@ export default function Login() {
               required
               autoComplete="new-password"
             />
-
-            <div className={styles.roleSelect}>
-              <label className={styles.roleLabel} htmlFor="reg-role">
-                Role
-              </label>
-              <select
-                id="reg-role"
-                className={styles.roleDropdown}
-                value={regRole}
-                onChange={(e) => setRegRole(e.target.value)}
-              >
-                {ROLE_OPTIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {ROLE_LABEL[r]}
-                  </option>
-                ))}
-              </select>
-            </div>
 
             <Button type="submit" variant="accent" className={styles.submit}>
               Create Account

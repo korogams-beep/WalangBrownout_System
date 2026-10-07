@@ -5,7 +5,7 @@ import DataTable from '../components/ui/DataTable.jsx';
 import Button from '../components/ui/Button.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
 import { UserIcon, LockIcon, PlusIcon, EditIcon, TrashIcon } from '../components/ui/Icons.jsx';
-import { useAuth, usePermissions, ROLE_LABEL } from '../context/AuthContext.jsx';
+import { useAuth, usePermissions, ROLE_LABEL, ROLE_OPTIONS } from '../context/AuthContext.jsx';
 import { useInventory } from '../context/InventoryContext.jsx';
 import { generateReorderRule } from '../utils/inventoryLogic.js';
 import styles from './Settings.module.css';
@@ -13,7 +13,7 @@ import styles from './Settings.module.css';
 const emptySupplier = { name: '', contactPerson: '', phone: '', email: '', address: '' };
 
 export default function Settings() {
-  const { user, renameUser } = useAuth();
+  const { user, renameUser, registeredUsers, updateUserRole, toggleUserActive, deleteUser } = useAuth();
   const { canManageCatalog, isAdmin } = usePermissions();
   const {
     products,
@@ -54,6 +54,11 @@ export default function Settings() {
   const [supplierError, setSupplierError] = useState('');
   const [deleteSupplierTarget, setDeleteSupplierTarget] = useState(null);
 
+  // ── Account management ─────────────────────────────────────────────────
+  // roleModal: null = closed | user-object (open for role change)
+  const [roleModal, setRoleModal] = useState(null);
+  const [roleDraft, setRoleDraft] = useState('');
+  const [deleteAccountTarget, setDeleteAccountTarget] = useState(null);
   function openAddSupplier() {
     setSupplierForm(emptySupplier);
     setSupplierError('');
@@ -89,6 +94,30 @@ export default function Settings() {
     if (deleteSupplierTarget) {
       deleteSupplier(deleteSupplierTarget.id);
       setDeleteSupplierTarget(null);
+    }
+  }
+
+  // ── Account management handlers ────────────────────────────────────────
+  function openRoleModal(account) {
+    setRoleDraft(account.role);
+    setRoleModal(account);
+  }
+
+  function handleRoleSubmit(e) {
+    e.preventDefault();
+    if (roleModal) {
+      updateUserRole(roleModal.username, roleDraft);
+      setRoleModal(null);
+    }
+  }
+
+  function handleDeleteAccountConfirm() {
+    if (deleteAccountTarget) {
+      const result = deleteUser(deleteAccountTarget.username, user);
+      if (result && !result.ok) {
+        alert(result.message);
+      }
+      setDeleteAccountTarget(null);
     }
   }
 
@@ -217,8 +246,74 @@ export default function Settings() {
         </Card>
       )}
 
-      {/* ── Automated Reorder Rules ──────────────────────────────────── */}
-      <Card
+      {/* ── Accounts Management — Admin only ────────────────────────── */}
+      {isAdmin && (
+        <Card
+          title="Accounts Management"
+          className={styles.accountsCard}
+        >
+          <p className={styles.helperText}>
+            Manage all registered accounts. Only Admins can view and edit this section.
+          </p>
+          <DataTable
+            rowKey="username"
+            rows={registeredUsers}
+            emptyMessage="No accounts found."
+            columns={[
+              { key: 'username', header: 'Username' },
+              {
+                key: 'role',
+                header: 'Role',
+                render: (acct) => ROLE_LABEL[acct.role] ?? acct.role,
+              },
+              {
+                key: 'active',
+                header: 'Status',
+                render: (acct) => (
+                  <StatusBadge status={acct.active ? 'Active' : 'Inactive'} />
+                ),
+              },
+              {
+                key: '_actions',
+                header: 'Actions',
+                align: 'right',
+                render: (acct) => (
+                  <span className={styles.supplierActions}>
+                    <button
+                      type="button"
+                      className={styles.supplierActionBtn}
+                      title="Change role"
+                      onClick={() => openRoleModal(acct)}
+                    >
+                      <EditIcon width={14} height={14} />
+                      Role
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.supplierActionBtn}
+                      title={acct.active ? 'Deactivate account' : 'Reactivate account'}
+                      onClick={() => toggleUserActive(acct.username)}
+                    >
+                      {acct.active ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.supplierActionBtn} ${styles.supplierActionBtnDelete}`}
+                      title="Delete account"
+                      onClick={() => setDeleteAccountTarget(acct)}
+                    >
+                      <TrashIcon width={14} height={14} />
+                      Delete
+                    </button>
+                  </span>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      )}
+
+      {/* ── Automated Reorder Rules ──────────────────────────────────── */}      <Card
         title="Automated Reorder Rules"
         action={
           <Button
@@ -383,6 +478,56 @@ export default function Settings() {
             <div className={styles.modalFooter}>
               <Button variant="secondary" onClick={() => setDeleteSupplierTarget(null)}>Cancel</Button>
               <Button variant="danger" onClick={handleDeleteSupplierConfirm}>Delete</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Change Role modal ───────────────────────────────────────── */}
+      {roleModal !== null && (
+        <div className={styles.modalOverlay} onClick={() => setRoleModal(null)}>
+          <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Change Role — {roleModal.username}</h3>
+            <form onSubmit={handleRoleSubmit}>
+              <div className={styles.modalBody}>
+                <label className={styles.modalLabel}>
+                  New Role
+                  <select
+                    className={styles.modalInput}
+                    value={roleDraft}
+                    onChange={(e) => setRoleDraft(e.target.value)}
+                  >
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className={styles.modalFooter}>
+                <Button type="button" variant="secondary" onClick={() => setRoleModal(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="accent">
+                  Save Role
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Account confirmation ──────────────────────────────── */}
+      {deleteAccountTarget && (
+        <div className={styles.modalOverlay} onClick={() => setDeleteAccountTarget(null)}>
+          <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Delete Account?</h3>
+            <p className={styles.modalBody}>
+              <strong>{deleteAccountTarget.username}</strong> will be permanently removed.
+              This cannot be undone.
+            </p>
+            <div className={styles.modalFooter}>
+              <Button variant="secondary" onClick={() => setDeleteAccountTarget(null)}>Cancel</Button>
+              <Button variant="danger" onClick={handleDeleteAccountConfirm}>Delete</Button>
             </div>
           </div>
         </div>
