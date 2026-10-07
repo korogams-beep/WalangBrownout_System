@@ -106,12 +106,20 @@ export function AuthProvider({ children }) {
 
       /**
        * deleteUser(username) — permanently removes a user from the registry.
-       * Must not delete the currently logged-in user.
+       * Guards: cannot delete the currently logged-in user (self-deletion).
+       * Returns { ok: false, message } when the guard triggers.
        */
-      deleteUser: (username) => {
+      deleteUser: (username, currentUser) => {
+        if (
+          currentUser &&
+          currentUser.username.toLowerCase() === username.toLowerCase()
+        ) {
+          return { ok: false, message: 'You cannot delete your own account.' };
+        }
         setRegisteredUsers((prev) =>
           prev.filter((u) => u.username.toLowerCase() !== username.toLowerCase())
         );
+        return { ok: true };
       },
     }),
     [registeredUsers]

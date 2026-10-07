@@ -113,7 +113,10 @@ export default function Settings() {
 
   function handleDeleteAccountConfirm() {
     if (deleteAccountTarget) {
-      deleteUser(deleteAccountTarget.username);
+      const result = deleteUser(deleteAccountTarget.username, user);
+      if (result && !result.ok) {
+        alert(result.message);
+      }
       setDeleteAccountTarget(null);
     }
   }

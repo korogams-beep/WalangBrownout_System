@@ -86,3 +86,28 @@ This change implements four user-facing requirements across five source files: (
 ## Build verification
 
 `npm run build` passed with zero errors after all changes were applied (Vite v5.4.21, 79 modules transformed).
+
+---
+
+## Patch — Security fixes (2026-10-07)
+
+Two security gaps found during review were fixed directly:
+
+### `src/context/AuthContext.jsx`
+
+| What changed | Detail |
+|---|---|
+| `login()` — active check | Added `if (!found.active) return { ok: false, message: 'This account has been deactivated.' }` after the password check. Deactivated accounts can no longer authenticate. |
+| `deleteUser()` — self-deletion guard | Accepts a second argument `currentUser`. Returns `{ ok: false, message: 'You cannot delete your own account.' }` if the target username matches the current session's username. |
+
+### `src/pages/Settings.jsx`
+
+| What changed | Detail |
+|---|---|
+| `handleDeleteAccountConfirm()` — guard response | Passes `user` as the second argument to `deleteUser(username, user)`. If the guard returns `{ ok: false }`, shows an `alert()` with the message and closes the modal without deleting. |
+
+**Why:** Without the active check, toggling a user inactive was purely cosmetic — they could still log in. Without the self-deletion guard, an Admin could delete their own account and be left with an orphaned session (no route back).
+
+### Build verification
+
+`npm run build` passed with zero errors (Vite v5.4.21, 79 modules, 849ms).
