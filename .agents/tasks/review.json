@@ -1,8 +1,0 @@
-{
-  "verdict": "CHANGES_REQUESTED",
-  "findings": [
-    "Deactivated accounts can still log in — login() in AuthContext.jsx never checks found.active before calling setUser. Add a guard after the password check: if (!found.active) return { ok: false, message: 'Account is deactivated.' };",
-    "Admin self-delete causes unrecoverable session state — deleteUser() and handleDeleteAccountConfirm() have no guard against deleting the currently-authenticated user. Disable the Delete button when acct.username === user?.username and/or return early in deleteUser when the target matches the active session."
-  ],
-  "reviewDoc": "c:\\Users\\Admin\\WalangBrownout_UI-UX\\.agents\\tasks\\review.md"
-}
