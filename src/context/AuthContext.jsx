@@ -26,9 +26,9 @@ export const ROLE_OPTIONS = ['admin', 'manager', 'staff'];
 // In-memory user registry — seed with demo accounts so the app works
 // out of the box. A real backend (Module 2) would replace this entirely.
 const INITIAL_USERS = [
-  { username: 'admin', password: 'admin123', role: 'admin' },
-  { username: 'manager1', password: 'manager123', role: 'manager' },
-  { username: 'staff1', password: 'staff123', role: 'staff' },
+  { username: 'admin', password: 'admin123', role: 'admin', active: true },
+  { username: 'manager1', password: 'manager123', role: 'manager', active: true },
+  { username: 'staff1', password: 'staff123', role: 'staff', active: true },
 ];
 
 const AuthContext = createContext(null);
@@ -72,7 +72,7 @@ export function AuthProvider({ children }) {
           (u) => u.username.toLowerCase() === trimmed.toLowerCase()
         );
         if (exists) return { ok: false, message: 'Username already taken.' };
-        setRegisteredUsers((prev) => [...prev, { username: trimmed, password, role }]);
+        setRegisteredUsers((prev) => [...prev, { username: trimmed, password, role, active: true }]);
         return { ok: true };
       },
 
@@ -80,11 +80,47 @@ export function AuthProvider({ children }) {
 
       renameUser: (username) =>
         setUser((prev) => (prev ? { ...prev, username: username?.trim() || prev.username } : prev)),
+
+      /**
+       * updateUserRole(username, newRole) — changes a registered user's role.
+       */
+      updateUserRole: (username, newRole) => {
+        if (!ROLE_OPTIONS.includes(newRole)) return;
+        setRegisteredUsers((prev) =>
+          prev.map((u) =>
+            u.username.toLowerCase() === username.toLowerCase() ? { ...u, role: newRole } : u
+          )
+        );
+      },
+
+      /**
+       * toggleUserActive(username) — flips the active flag (deactivate/reactivate).
+       */
+      toggleUserActive: (username) => {
+        setRegisteredUsers((prev) =>
+          prev.map((u) =>
+            u.username.toLowerCase() === username.toLowerCase() ? { ...u, active: !u.active } : u
+          )
+        );
+      },
+
+      /**
+       * deleteUser(username) — permanently removes a user from the registry.
+       * Must not delete the currently logged-in user.
+       */
+      deleteUser: (username) => {
+        setRegisteredUsers((prev) =>
+          prev.filter((u) => u.username.toLowerCase() !== username.toLowerCase())
+        );
+      },
     }),
     [registeredUsers]
   );
 
-  const value = useMemo(() => ({ user, ...actions }), [user, actions]);
+  const value = useMemo(
+    () => ({ user, registeredUsers, ...actions }),
+    [user, registeredUsers, actions]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
