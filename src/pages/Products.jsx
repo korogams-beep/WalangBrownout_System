@@ -13,7 +13,7 @@ import productStyles from './Products.module.css';
 
 export default function Products() {
   const { products, inventory, batches, transactions, deleteProduct } = useInventory();
-  const { canManageCatalog } = usePermissions();
+  const { canAddProduct, canEditProduct, canDeleteProduct } = usePermissions();
   const [query, setQuery] = useState('');
 
   // Modal state — null = closed, 'add' = add mode, product object = edit mode
@@ -88,8 +88,8 @@ export default function Products() {
               header: 'Expiry Date',
               render: (r) => (r.expiryDate ? new Date(r.expiryDate).toLocaleDateString() : '—'),
             },
-            // Actions column — only rendered for Admin
-            ...(canManageCatalog
+            // Actions column — shown when the role can edit or delete (or both)
+            ...(canEditProduct || canDeleteProduct
               ? [
                   {
                     key: '_actions',
@@ -97,24 +97,28 @@ export default function Products() {
                     align: 'right',
                     render: (r) => (
                       <span className={productStyles.rowActions}>
-                        <button
-                          type="button"
-                          className={productStyles.actionBtn}
-                          title="Edit product"
-                          onClick={() => setModalState(r)}
-                        >
-                          <EditIcon width={15} height={15} />
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className={`${productStyles.actionBtn} ${productStyles.actionBtnDelete}`}
-                          title="Delete product"
-                          onClick={() => setDeleteTarget(r)}
-                        >
-                          <TrashIcon width={15} height={15} />
-                          Delete
-                        </button>
+                        {canEditProduct && (
+                          <button
+                            type="button"
+                            className={productStyles.actionBtn}
+                            title="Edit product"
+                            onClick={() => setModalState(r)}
+                          >
+                            <EditIcon width={15} height={15} />
+                            Edit
+                          </button>
+                        )}
+                        {canDeleteProduct && (
+                          <button
+                            type="button"
+                            className={`${productStyles.actionBtn} ${productStyles.actionBtnDelete}`}
+                            title="Delete product"
+                            onClick={() => setDeleteTarget(r)}
+                          >
+                            <TrashIcon width={15} height={15} />
+                            Delete
+                          </button>
+                        )}
                       </span>
                     ),
                   },
@@ -125,7 +129,7 @@ export default function Products() {
       </Card>
 
       {/* Add Product button — visible to Admin only */}
-      {canManageCatalog && (
+      {canAddProduct && (
         <div className={styles.footerAction}>
           <Button
             variant="accent"
