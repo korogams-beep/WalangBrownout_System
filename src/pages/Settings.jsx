@@ -4,7 +4,7 @@ import Card from '../components/ui/Card.jsx';
 import DataTable from '../components/ui/DataTable.jsx';
 import Button from '../components/ui/Button.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
-import { UserIcon, LockIcon, PlusIcon, EditIcon, TrashIcon } from '../components/ui/Icons.jsx';
+import { UserIcon, PlusIcon, EditIcon, TrashIcon } from '../components/ui/Icons.jsx';
 import { useAuth, usePermissions, ROLE_LABEL, ROLE_OPTIONS } from '../context/AuthContext.jsx';
 import { useInventory } from '../context/InventoryContext.jsx';
 import { generateReorderRule } from '../utils/inventoryLogic.js';
@@ -14,7 +14,14 @@ const emptySupplier = { name: '', contactPerson: '', phone: '', email: '', addre
 
 export default function Settings() {
   const { user, renameUser, registeredUsers, updateUserRole, toggleUserActive, deleteUser } = useAuth();
-  const { canManageCatalog, isAdmin } = usePermissions();
+  const {
+    canViewSuppliers,
+    canAddSupplier,
+    canEditSupplier,
+    canDeleteSupplier,
+    canManageAccounts,
+    canManageReorderRules,
+  } = usePermissions();
   const {
     products,
     reorderRules,
@@ -188,20 +195,22 @@ export default function Settings() {
         )}
       </Card>
 
-      {/* ── Supplier Management — Admin only ────────────────────────── */}
-      {isAdmin && (
+      {/* ── Supplier Management — visible to all roles; edit/add/delete gated ── */}
+      {canViewSuppliers && (
         <Card
           title="Supplier Management"
           className={styles.supplierCard}
           action={
-            <Button variant="accent" icon={PlusIcon} onClick={openAddSupplier}>
-              Add Supplier
-            </Button>
+            canAddSupplier ? (
+              <Button variant="accent" icon={PlusIcon} onClick={openAddSupplier}>
+                Add Supplier
+              </Button>
+            ) : null
           }
         >
           <p className={styles.helperText}>
-            Manage the suppliers that provide products to this inventory. Only Admins can view and
-            edit this section.
+            Manage the suppliers that provide products to this inventory. Adding and deleting
+            suppliers is restricted to Admins; Managers can edit supplier details.
           </p>
           <DataTable
             rowKey="id"
@@ -214,40 +223,48 @@ export default function Settings() {
               { key: 'phone', header: 'Phone' },
               { key: 'email', header: 'Email' },
               { key: 'address', header: 'Address' },
-              {
-                key: '_actions',
-                header: 'Actions',
-                align: 'right',
-                render: (s) => (
-                  <span className={styles.supplierActions}>
-                    <button
-                      type="button"
-                      className={styles.supplierActionBtn}
-                      title="Edit supplier"
-                      onClick={() => openEditSupplier(s)}
-                    >
-                      <EditIcon width={14} height={14} />
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.supplierActionBtn} ${styles.supplierActionBtnDelete}`}
-                      title="Delete supplier"
-                      onClick={() => setDeleteSupplierTarget(s)}
-                    >
-                      <TrashIcon width={14} height={14} />
-                      Delete
-                    </button>
-                  </span>
-                ),
-              },
+              ...(canEditSupplier || canDeleteSupplier
+                ? [
+                    {
+                      key: '_actions',
+                      header: 'Actions',
+                      align: 'right',
+                      render: (s) => (
+                        <span className={styles.supplierActions}>
+                          {canEditSupplier && (
+                            <button
+                              type="button"
+                              className={styles.supplierActionBtn}
+                              title="Edit supplier"
+                              onClick={() => openEditSupplier(s)}
+                            >
+                              <EditIcon width={14} height={14} />
+                              Edit
+                            </button>
+                          )}
+                          {canDeleteSupplier && (
+                            <button
+                              type="button"
+                              className={`${styles.supplierActionBtn} ${styles.supplierActionBtnDelete}`}
+                              title="Delete supplier"
+                              onClick={() => setDeleteSupplierTarget(s)}
+                            >
+                              <TrashIcon width={14} height={14} />
+                              Delete
+                            </button>
+                          )}
+                        </span>
+                      ),
+                    },
+                  ]
+                : []),
             ]}
           />
         </Card>
       )}
 
       {/* ── Accounts Management — Admin only ────────────────────────── */}
-      {isAdmin && (
+      {canManageAccounts && (
         <Card
           title="Accounts Management"
           className={styles.accountsCard}
@@ -313,18 +330,18 @@ export default function Settings() {
         </Card>
       )}
 
-      {/* ── Automated Reorder Rules ──────────────────────────────────── */}      <Card
+      {/* ── Automated Reorder Rules ──────────────────────────────────── */}
+      <Card
         title="Automated Reorder Rules"
         action={
-          <Button
-            variant="secondary"
-            icon={canManageCatalog ? undefined : LockIcon}
-            disabled={!canManageCatalog}
-            title={canManageCatalog ? undefined : 'Restricted to Admin'}
-            onClick={() => canManageCatalog && regenerateReorderRules()}
-          >
-            Recalculate All (current month)
-          </Button>
+          canManageReorderRules ? (
+            <Button
+              variant="secondary"
+              onClick={regenerateReorderRules}
+            >
+              Recalculate All (current month)
+            </Button>
+          ) : null
         }
       >
         <p className={styles.helperText}>
@@ -351,7 +368,7 @@ export default function Settings() {
         />
       </Card>
 
-      {unconfiguredProducts.length > 0 && (
+      {canManageReorderRules && unconfiguredProducts.length > 0 && (
         <Card title="Generate a Missing Rule" className={styles.generatorCard}>
           <p className={styles.helperText}>
             Pick a product — its rule is computed automatically from its class, nothing to fill in by hand.
@@ -369,10 +386,9 @@ export default function Settings() {
             </select>
             <Button
               variant="accent"
-              icon={canManageCatalog ? undefined : LockIcon}
-              disabled={!canManageCatalog || !previewRule}
-              title={canManageCatalog ? undefined : 'Restricted to Admin'}
-              onClick={() => canManageCatalog && handleSaveRule()}
+              icon={PlusIcon}
+              disabled={!previewRule}
+              onClick={handleSaveRule}
             >
               Save Generated Rule
             </Button>

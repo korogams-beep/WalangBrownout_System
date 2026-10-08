@@ -150,8 +150,21 @@ export function usePermissions() {
     isAdmin: role === 'admin',
     isManager: role === 'manager',
     isStaff: role === 'staff',
-    // Products / Settings reorder-rule management — Admin only.
+    // Products / Settings route-level guard — Admin only (used by RequireRole in App.jsx).
     canManageCatalog: role === 'admin',
+    // Products: granular in-page controls.
+    canAddProduct: role === 'admin',
+    canEditProduct: role === 'admin' || role === 'manager',
+    canDeleteProduct: role === 'admin',
+    // Suppliers: granular in-page controls.
+    canViewSuppliers: role === 'admin' || role === 'manager' || role === 'staff',
+    canAddSupplier: role === 'admin',
+    canEditSupplier: role === 'admin' || role === 'manager',
+    canDeleteSupplier: role === 'admin',
+    // Accounts Management — Admin only.
+    canManageAccounts: role === 'admin',
+    // Reorder Rules management — Admin only.
+    canManageReorderRules: role === 'admin',
     // Transactions: adding a new one — Admin + Manager.
     canAddTransaction: role === 'admin' || role === 'manager',
     // Transactions: changing a status — Admin + Manager + Staff (anyone logged in).
