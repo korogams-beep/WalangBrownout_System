@@ -1,0 +1,15 @@
+import styles from './Card.module.css';
+
+export default function Card({ title, action, children, className = '' }) {
+  return (
+    <section className={`${styles.card} ${className}`}>
+      {(title || action) && (
+        <div className={styles.head}>
+          {title && <h3 className={styles.title}>{title}</h3>}
+          {action}
+        </div>
+      )}
+      <div className={styles.body}>{children}</div>
+    </section>
+  );
+}
