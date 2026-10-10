@@ -7,7 +7,7 @@ A decoupled monorepo web application for inventory control, featuring a React + 
 ## Repository Structure
 
 ```
-WholeSystemTest/
+Walang-Brownout-Appliances-Folder-Structure/
 ├── frontend/               # React 18 + Vite SPA client
 │   ├── src/                # UI components, contexts, pages, styles, and utils
 │   ├── index.html          # HTML entry point
