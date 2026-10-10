@@ -309,7 +309,10 @@ export default function Settings() {
                       type="button"
                       className={styles.supplierActionBtn}
                       title={acct.active ? 'Deactivate account' : 'Reactivate account'}
-                      onClick={() => toggleUserActive(acct.username)}
+                      onClick={() => {
+                        const res = toggleUserActive(acct.username, user);
+                        if (res && !res.ok) alert(res.message);
+                      }}
                     >
                       {acct.active ? 'Deactivate' : 'Reactivate'}
                     </button>

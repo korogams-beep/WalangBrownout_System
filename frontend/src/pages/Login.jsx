@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './Login.module.css';
-import { BoltIcon } from '../components/ui/Icons.jsx';
+import { BoltIcon, EyeIcon, EyeOffIcon } from '../components/ui/Icons.jsx';
 import Button from '../components/ui/Button.jsx';
 import { useAuth, ROLE_HOME } from '../context/AuthContext.jsx';
 
@@ -12,6 +12,11 @@ export default function Login() {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Password visibility state
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
 
   // Sign-in fields — isolated state
   const [loginUsername, setLoginUsername] = useState('');
@@ -51,6 +56,8 @@ export default function Login() {
     setRegUsername('');
     setRegPassword('');
     setRegConfirmPassword('');
+    setShowRegPassword(false);
+    setShowRegConfirmPassword(false);
     setMode('login');
   }
 
@@ -64,6 +71,9 @@ export default function Login() {
     setRegUsername('');
     setRegPassword('');
     setRegConfirmPassword('');
+    setShowLoginPassword(false);
+    setShowRegPassword(false);
+    setShowRegConfirmPassword(false);
   }
 
   return (
@@ -107,15 +117,26 @@ export default function Login() {
               required
               autoComplete="username"
             />
-            <input
-              className={styles.input}
-              type="password"
-              placeholder="Password"
-              value={loginPassword}
-              onChange={(e) => setLoginPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
+            <div className={styles.passwordField}>
+              <input
+                className={styles.passwordInput}
+                type={showLoginPassword ? 'text' : 'password'}
+                placeholder="Password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className={styles.togglePasswordBtn}
+                onClick={() => setShowLoginPassword((prev) => !prev)}
+                title={showLoginPassword ? 'Hide password' : 'Show password'}
+                aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+              >
+                {showLoginPassword ? <EyeOffIcon width={18} height={18} /> : <EyeIcon width={18} height={18} />}
+              </button>
+            </div>
             <Button type="submit" variant="accent" className={styles.submit}>
               Sign In
             </Button>
@@ -137,24 +158,46 @@ export default function Login() {
               required
               autoComplete="off"
             />
-            <input
-              className={styles.input}
-              type="password"
-              placeholder="Password"
-              value={regPassword}
-              onChange={(e) => setRegPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-            />
-            <input
-              className={styles.input}
-              type="password"
-              placeholder="Confirm Password"
-              value={regConfirmPassword}
-              onChange={(e) => setRegConfirmPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-            />
+            <div className={styles.passwordField}>
+              <input
+                className={styles.passwordInput}
+                type={showRegPassword ? 'text' : 'password'}
+                placeholder="Password"
+                value={regPassword}
+                onChange={(e) => setRegPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                className={styles.togglePasswordBtn}
+                onClick={() => setShowRegPassword((prev) => !prev)}
+                title={showRegPassword ? 'Hide password' : 'Show password'}
+                aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+              >
+                {showRegPassword ? <EyeOffIcon width={18} height={18} /> : <EyeIcon width={18} height={18} />}
+              </button>
+            </div>
+            <div className={styles.passwordField}>
+              <input
+                className={styles.passwordInput}
+                type={showRegConfirmPassword ? 'text' : 'password'}
+                placeholder="Confirm Password"
+                value={regConfirmPassword}
+                onChange={(e) => setRegConfirmPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                className={styles.togglePasswordBtn}
+                onClick={() => setShowRegConfirmPassword((prev) => !prev)}
+                title={showRegConfirmPassword ? 'Hide password' : 'Show password'}
+                aria-label={showRegConfirmPassword ? 'Hide password' : 'Show password'}
+              >
+                {showRegConfirmPassword ? <EyeOffIcon width={18} height={18} /> : <EyeIcon width={18} height={18} />}
+              </button>
+            </div>
 
             <Button type="submit" variant="accent" className={styles.submit}>
               Create Account
