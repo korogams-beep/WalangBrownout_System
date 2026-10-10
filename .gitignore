@@ -1,5 +1,36 @@
-node_modules
+# =============================================================================
+# WalangBrownout_System — Root .gitignore
+# Covers both /frontend (React/Vite) and /backend (Laravel) ecosystems
+# =============================================================================
 
-dist
+# ── Frontend (React / Vite / Node) ────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
 
-.agents/
+# ── Backend (Laravel / PHP / Composer) ────────────────────────────────────────
+backend/vendor/
+backend/.env
+backend/.env.backup
+backend/.env.production
+backend/storage/*.key
+backend/public/storage
+backend/bootstrap/cache/*.php
+
+# Laravel log files
+backend/storage/logs/*.log
+
+# SQLite local dev database (not needed in production — Railway uses MySQL)
+backend/database/database.sqlite
+
+# ── OS & Editor artifacts ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── CI/CD ────────────────────────────────────────────────────────────────────
+.github/workflows/*.env
