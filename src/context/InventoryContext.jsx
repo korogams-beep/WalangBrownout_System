@@ -10,6 +10,9 @@ import {
   STOCK_EFFECT_STEP,
 } from '../utils/inventoryLogic.js';
 
+// API integration point: see src/services/api.js.
+// Replace stub implementations there to connect to the real Laravel backend.
+
 const InventoryContext = createContext(null);
 
 let nextTxnId = 1;
@@ -142,8 +145,11 @@ function reducer(state, action) {
     case 'ADD_PRODUCT': {
       const { product } = action.payload;
       const startingQty = Number(product.qtyOnHand) || 0;
+      // ISSUE-003: enforce PID- prefix — the canonical product ID format for this system.
+      const safeId = product.id?.startsWith('PID-') ? product.id : `PID-${product.id}`;
       const classifiedProduct = {
         ...product,
+        id: safeId,
         qtyOnHand: startingQty,
         productClass: classifyProduct(product),
         seasonal: isSeasonal(product),

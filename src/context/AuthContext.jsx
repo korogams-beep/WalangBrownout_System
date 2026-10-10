@@ -1,13 +1,8 @@
 import { createContext, useContext, useMemo, useState } from 'react';
+import { normalizeRole } from '../services/api.js';
 
-// Frontend-only session + role state. Real authentication against
-// Laravel/Sanctum is Module 2 (backend) scope; this just tracks who's
-// "logged in" for the rest of the UI to gate screens/actions by:
-//   - admin:   full access everywhere, no restrictions.
-//   - manager: can VIEW every module, and on Transactions can both add a new
-//              transaction (pop-up form) and change a transaction's status.
-//   - staff:   can VIEW every module, but on Transactions can only change a
-//              transaction's status — no adding new transactions.
+// API integration point: see src/services/api.js.
+// Replace stub implementations there to connect to the real Laravel backend.
 
 export const ROLE_HOME = {
   admin: '/dashboard',
@@ -21,6 +16,8 @@ export const ROLE_LABEL = {
   staff: 'Staff',
 };
 
+// ISSUE-002: roles are normalised to lowercase via normalizeRole() in src/services/api.js.
+// Backend enums (Admin/Manager/Staff) map to these lowercase values at the auth boundary.
 export const ROLE_OPTIONS = ['admin', 'manager', 'staff'];
 
 // In-memory user registry — seed with demo accounts so the app works
@@ -53,7 +50,7 @@ export function AuthProvider({ children }) {
         if (found.password !== password) return { ok: false, message: 'Incorrect password.' };
         setUser({
           username: found.username,
-          role: found.role,
+          role: normalizeRole(found.role),
           loginTime: new Date().toISOString(),
         });
         return { ok: true, role: found.role };
@@ -72,7 +69,7 @@ export function AuthProvider({ children }) {
           (u) => u.username.toLowerCase() === trimmed.toLowerCase()
         );
         if (exists) return { ok: false, message: 'Username already taken.' };
-        setRegisteredUsers((prev) => [...prev, { username: trimmed, password, role, active: true }]);
+        setRegisteredUsers((prev) => [...prev, { username: trimmed, password, role: normalizeRole(role), active: true }]);
         return { ok: true };
       },
 

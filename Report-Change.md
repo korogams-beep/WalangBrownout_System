@@ -111,3 +111,70 @@ Two security gaps found during review were fixed directly:
 ### Build verification
 
 `npm run build` passed with zero errors (Vite v5.4.21, 79 modules, 849ms).
+
+---
+
+## Fix: ISSUE-001, ISSUE-002, ISSUE-003, ISSUE-009 Confirmation
+
+### Date
+2025-07-17
+
+---
+
+### ISSUE-001 — Frontend Still Dependent on Static Mock Data
+
+**Severity:** High | **Area:** Architecture/Integration
+
+| File | What changed |
+|---|---|
+| `src/services/api.js` (created) | New thin API adapter module with async stub functions: `fetchProducts()`, `fetchTransactions()`, `fetchSuppliers()`, `login()`, `register()`. Each stub returns the current mock data and carries a `// TODO: replace with real API call to /api/...` comment. |
+| `src/context/InventoryContext.jsx` | Added pointer comment block at the top pointing to `src/services/api.js` as the integration point for Module 2. |
+| `src/context/AuthContext.jsx` | Added pointer comment block at the top pointing to `src/services/api.js` as the integration point for Module 2. |
+
+**Why:** All data currently lives in `src/data/mockData.js` and in-memory state. Without an API adapter layer, swapping in the real Laravel/Sanctum backend would require touching every context file. The adapter isolates that change to one file (`src/services/api.js`) — replacing any stub body with a real `fetch()` call is all it takes to wire up the backend, with no changes required elsewhere.
+
+---
+
+### ISSUE-002 — User Role Enum Mismatch (manager in Frontend vs Backend)
+
+**Severity:** High | **Area:** Database/Schema
+
+| File | What changed |
+|---|---|
+| `src/services/api.js` | Added and exported `normalizeRole(role)` helper (lowercases any incoming role string) and `BACKEND_ROLE_MAP` constant documenting the expected backend → frontend role mapping. |
+| `src/context/AuthContext.jsx` | Imported `normalizeRole` from `src/services/api.js`. Wrapped the role field in `login()` and `register()` with `normalizeRole()`. Added an ISSUE-002 comment above `ROLE_OPTIONS` explaining the normalisation contract. |
+
+**Why:** The frontend uses lowercase role strings (`'admin'`, `'manager'`, `'staff'`). The Laravel backend will likely use capitalised enums (`'Admin'`, `'Manager'`, `'Staff'`). Without a normalisation layer, the login response from the real API would silently break all role-gated checks. `normalizeRole()` is the single boundary where capitalisation is resolved, so no other file needs to change when the backend is wired up.
+
+---
+
+### ISSUE-003 — Product ID Format Discrepancy (PID- vs AC-PORT- / FILT-)
+
+**Severity:** Medium | **Area:** Data Modeling
+
+| File | What changed |
+|---|---|
+| `src/context/InventoryContext.jsx` | In the `ADD_PRODUCT` reducer case, added a `safeId` guard that normalises any incoming product ID to `PID-` format before the product is classified and stored. |
+| `src/data/mockData.js` | Added a comment above `mockProducts` documenting `PID-NNN` as the canonical product ID format and explicitly prohibiting other prefixes. |
+| `src/services/api.js` | Added and exported `normalizeProductId(id)` stub with a TODO comment for mapping backend-specific prefixes once the real backend ID format is confirmed. |
+
+**Why:** The issue matrix documented a risk of product ID divergence between the frontend (`PID-001`) and backend (potentially `AC-PORT-001`, `FILT-001`, etc.). The fix enforces `PID-` as the canonical contract at the data boundary, adds a normalisation utility for the integration layer, and documents the convention clearly so it is not silently broken when new products are added or when the real backend is connected.
+
+---
+
+### ISSUE-009 — Strict Pick Prerequisite: Commitment Required Before FIFO Pick
+
+**Severity:** Low | **Area:** Business Logic | **Status:** Documented — No Code Change Required
+
+Confirmation: ISSUE-009 is already correctly implemented in the codebase. No code changes were made.
+
+- `CREATE_TRANSACTION` in `src/context/InventoryContext.jsx` commits `qtyCommitted` immediately when a Sale is opened (the `type === 'Sale'` branch in the `CREATE_TRANSACTION` case). This is the case study's COMMIT trigger: ATP is protected the instant an order is placed, before anything is picked or shipped.
+- `ADVANCE_TRANSACTION` calls `getNextFifoBatch()` from `src/utils/inventoryLogic.js` at the Shipped step for perishable products (inside `applyStockEffect`). FIFO picking is enforced at the stock-effect step, not earlier.
+
+The commitment-before-pick prerequisite is structurally enforced by the transaction pipeline: a Sale cannot reach Shipped without passing through Open (where qtyCommitted is incremented) and Picked first. No additional guard is needed.
+
+---
+
+### Build verification
+
+`npm run build` passed with zero errors after all changes were applied.

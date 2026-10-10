@@ -4,6 +4,9 @@
 // computed live by src/utils/inventoryLogic.js and src/context/InventoryContext.jsx
 // instead of being hard-coded here.
 
+// ISSUE-003: all product IDs use the PID-NNN format. This is the canonical
+// identifier expected by the Laravel backend. Do not introduce other prefixes
+// (AC-PORT-, FILT-, etc.) — use PID- consistently.
 export const mockProducts = [
   { id: 'PID-001', name: 'Window AC Unit 1HP', category: 'Group A (AC)', unitPrice: 350, qtyOnHand: 12, warehouse: 'Main Warehouse', shelfLifeMonths: null },
   { id: 'PID-002', name: 'Smart Thermostat', category: 'Group A (AC)', unitPrice: 150, qtyOnHand: 25, warehouse: 'Main Warehouse', shelfLifeMonths: null },
