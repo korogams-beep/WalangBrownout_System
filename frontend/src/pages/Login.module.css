@@ -102,6 +102,48 @@
   outline: none;
 }
 
+.passwordField {
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.passwordInput {
+  width: 100%;
+  padding: 11px 42px 11px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  box-sizing: border-box;
+}
+
+.passwordInput:focus {
+  border-color: var(--color-amber);
+  outline: none;
+}
+
+.togglePasswordBtn {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-400);
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.togglePasswordBtn:hover {
+  color: var(--color-navy-950);
+  background: rgba(0, 0, 0, 0.05);
+}
+
 /* Role dropdown row (sign-up only) */
 .roleSelect {
   width: 100%;
