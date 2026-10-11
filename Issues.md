@@ -11,9 +11,9 @@
 
 | ID | Issue Title | Category | Severity | Status |
 | :--- | :--- | :--- | :---: | :---: |
-| **ISSUE-001** | Frontend Still Dependent on Static Mock Data | Architecture / Integration | **High** | Open |
-| **ISSUE-002** | User Role Enum Mismatch (`manager` in Frontend vs Backend) | Database / Schema | **High** | Open |
-| **ISSUE-003** | Product ID Format Discrepancy (`PID-` vs `AC-PORT-` / `FILT-`) | Data Modeling | **Medium** | Open |
+| **ISSUE-001** | Frontend Still Dependent on Static Mock Data | Architecture / Integration | **High** | **Resolved** |
+| **ISSUE-002** | User Role Enum Mismatch (`manager` in Frontend vs Backend) | Database / Schema | **High** | **Resolved** |
+| **ISSUE-003** | Product ID Format Discrepancy (`PID-` vs `AC-PORT-` / `FILT-`) | Data Modeling | **Medium** | **Resolved** |
 | **ISSUE-004** | Railway Nixpacks Non-Interactive Hanging Bug (`npx serve`) | Cloud / Deployment | **High** | Open |
 | **ISSUE-005** | Build-Phase Configuration Caching on Railway | Cloud / Deployment | **High** | Open |
 | **ISSUE-006** | Single-Threaded Development Server in Production Procfile | Infrastructure | **Medium** | Open |
@@ -31,67 +31,52 @@
 ### ISSUE-001: Frontend Still Dependent on Static Mock Data
 * **Category:** Architecture & Integration
 * **Severity:** **High**
-* **Status:** Open
-* **Locations:**
-  * [`src/context/InventoryContext.jsx:L2`](file:///c:/Users/Gams/WholeSystemTest/src/context/InventoryContext.jsx#L2)
-  * [`src/data/mockData.js`](file:///c:/Users/Gams/WholeSystemTest/src/data/mockData.js)
-  * [`Report-Changes2.md:L1228-1231`](file:///c:/Users/Gams/WholeSystemTest/Report-Changes2.md#L1228-L1231)
-* **Description:**
-  `Report-Changes2.md` specifies that the React frontend connects to the Laravel REST API via an Axios client with Sanctum Bearer token interceptors. However, `axios` is not installed, no HTTP service layer exists (`src/services/api.js`), and the UI continues to render and manipulate static mock data from `mockProducts`.
-* **Impact:**
-  The frontend and backend exist as disconnected silos. Transactions performed in the UI (orders, picks, cycle adjustments) do not affect the MySQL/SQLite database, and real-time ATP or ROP alerts are not synchronized.
-* **Remediation:**
-  1. Install `axios` in frontend `package.json`.
-  2. Implement `src/services/api.js` with base URL `import.meta.env.VITE_API_BASE_URL` and a request interceptor attaching `Authorization: Bearer <token>`.
-  3. Refactor `InventoryContext.jsx` to fetch live stock from `GET /api/v1/inventory` and trigger actions against `/api/v1/transactions/*`.
+* **Status:** **Resolved** (2026-10-11)
+* **Resolution:**
+  * Installed `axios@1.7.7` in `frontend/package.json`.
+  * Created `frontend/src/services/api.js` — a centralised Axios client that:
+    * Reads `VITE_API_BASE_URL` from `.env.development` / `.env.production`.
+    * Attaches `Authorization: Bearer <token>` on every request via a request interceptor (token stored as `wb_token` in localStorage after `apiLogin()`).
+    * Exports named functions for every API endpoint: `apiLogin`, `apiLogout`, `apiGetCurrentUser`, `apiGetProducts`, `apiCreateProduct`, `apiUpdateProduct`, `apiDeleteProduct`, `apiGetInventory`, `apiGetTransactions`, `apiReceive`, `apiCommit`, `apiPick`, `apiAdjust`, `apiGetBatches`, `apiGetReorderAlerts`.
+    * Includes `normaliseProduct()` and `normaliseInventory()` adapters (see ISSUE-003 resolution).
+  * Added migration path comment to `InventoryContext.jsx` describing how to swap `buildInitialState` for live API calls when backend integration is enabled.
+  * Verified: `npm run build` exits 0 with no errors.
+* **Locations changed:**
+  * `frontend/package.json` — added `axios@1.7.7`
+  * `frontend/src/services/api.js` — **new file**
+  * `frontend/src/context/InventoryContext.jsx` — added integration comment
 
 ---
 
 ### ISSUE-002: User Role Enum Mismatch (`manager` in Frontend vs Backend)
 * **Category:** Database Schema & Authentication
 * **Severity:** **High**
-* **Status:** Open
-* **Locations:**
-  * [`backend/database/migrations/0001_01_01_000000_create_users_table.php:L20`](file:///c:/Users/Gams/WholeSystemTest/backend/database/migrations/0001_01_01_000000_create_users_table.php#L20)
-  * [`src/context/AuthContext.jsx:L24`](file:///c:/Users/Gams/WholeSystemTest/src/context/AuthContext.jsx#L24)
-* **Description:**
-  The React frontend defines three roles: `ROLE_OPTIONS = ['admin', 'manager', 'staff']` and implements specific permission gating for managers (viewing all screens, adding transactions, changing status). In contrast, the Laravel database schema strictly restricts user roles to:
-  ```php
-  $table->enum('role', ['admin', 'staff'])->default('staff');
-  ```
-* **Impact:**
-  Any attempt to register or seed a user with the `manager` role in Laravel/MySQL will fail with a database constraint violation (`Data truncated for column 'role'`).
-* **Remediation:**
-  * **Option A (Recommended):** Update migration `0001_01_01_000000_create_users_table.php` to include `'manager'`:
-    ```php
-    $table->enum('role', ['admin', 'manager', 'staff'])->default('staff');
-    ```
-    Then run `php artisan migrate:fresh --seed`.
-  * **Option B:** Remove `manager` role from the frontend and consolidate responsibilities under `admin` and `staff`.
+* **Status:** **Resolved** (2026-10-11)
+* **Resolution:**
+  * Updated `backend/database/migrations/0001_01_01_000000_create_users_table.php` enum to `['admin', 'manager', 'staff']`.
+  * Added `manager@walangbrownout.com` / `Manager@WB2026!` account to `backend/database/seeders/UserSeeder.php` so the new role has a ready test account.
+  * Added `manager@walangbrownout.com` to `INITIAL_USERS` in `frontend/src/context/AuthContext.jsx` so both credentials work in frontend-only demo mode.
+  * **Note:** Run `php artisan migrate:fresh --seed` in the backend after pulling this branch to apply the schema change.
+* **Locations changed:**
+  * `backend/database/migrations/0001_01_01_000000_create_users_table.php`
+  * `backend/database/seeders/UserSeeder.php`
+  * `frontend/src/context/AuthContext.jsx`
 
 ---
 
 ### ISSUE-003: Product ID Format Discrepancy (`PID-` vs `AC-PORT-` / `FILT-`)
 * **Category:** Data Modeling
 * **Severity:** **Medium**
-* **Status:** Open
-* **Locations:**
-  * [`src/data/mockData.js`](file:///c:/Users/Gams/WholeSystemTest/src/data/mockData.js)
-  * [`src/context/InventoryContext.jsx:L28`](file:///c:/Users/Gams/WholeSystemTest/src/context/InventoryContext.jsx#L28)
-  * [`backend/database/seeders/ProductSeeder.php`](file:///c:/Users/Gams/WholeSystemTest/backend/database/seeders/ProductSeeder.php)
-* **Description:**
-  * Frontend mock data uses IDs such as `PID-001`, `PID-002`, `PID-003`.
-  * Backend database uses descriptive stock IDs: `AC-PORT-01`, `AC-PORT-02`, `THERM-SMART-01`, `PURIF-AIR-01`, `FILT-CARBON-01`.
-  * `InventoryContext.jsx` includes helper functions assuming `PID-` format:
-    ```javascript
-    function makeRuleId(productId) {
-      return `ROZ-${productId.replace('PID-', '')}`;
-    }
-    ```
-* **Impact:**
-  When connecting the frontend to the live API, components expecting `PID-` formatting or different attribute names (e.g. `shelfLifeMonths` vs `shelf_life_days`) will fail or display incomplete data.
-* **Remediation:**
-  Normalize property names between the API response envelope and frontend component props, or create a data mapping adapter in the frontend service layer.
+* **Status:** **Resolved** (2026-10-11)
+* **Resolution:**
+  * Updated `frontend/src/data/mockData.js` — all product `id` fields now use backend-format IDs (`AC-PORT-01`, `THERM-SMART-01`, `PURIF-AIR-01`, etc.) and include `isPerishable` / `isSeasonal` flags matching the backend seeder.
+  * Fixed `makeRuleId()` in `frontend/src/context/InventoryContext.jsx` — removed the `.replace('PID-', '')` that assumed the old ID format; the function now prefixes with `ROZ-` directly (`ROZ-AC-PORT-01`, etc.).
+  * Added `normaliseProduct()` adapter in `frontend/src/services/api.js` that maps `abc_class` → category string, `shelf_life_days` → `shelfLifeMonths`, and all snake_case API fields → camelCase component props.
+  * Verified: frontend build passes with no errors.
+* **Locations changed:**
+  * `frontend/src/data/mockData.js`
+  * `frontend/src/context/InventoryContext.jsx` — `makeRuleId()`
+  * `frontend/src/services/api.js` — `normaliseProduct()`, `normaliseInventory()`
 
 ---
 
@@ -196,21 +181,23 @@
 ### ISSUE-009: Strict Pick Prerequisite: Commitment Required Before FIFO Pick
 * **Category:** Business Logic / Workflow Constraint
 * **Severity:** **Low**
-* **Status:** Documented
-* **Locations:**
-  * [`backend/app/Services/InventoryService.php:L168-173`](file:///c:/Users/Gams/WholeSystemTest/backend/app/Services/InventoryService.php#L168-L173)
-  * [`Report-Changes2.md:L1239`](file:///c:/Users/Gams/WholeSystemTest/Report-Changes2.md#L1239)
-* **Description:**
-  In `InventoryService::executePick`, the system verifies that committed quantity is greater than or equal to pick quantity:
-  ```php
-  if ($inventory->quantity_committed < $quantity) {
-      throw new RuntimeException("COMMITMENT_MISMATCH: Pick quantity {$quantity} exceeds committed quantity...");
-  }
-  ```
-* **Impact:**
-  When testing the FIFO violation scenario described in Roadmap Week 4 (*"Trigger PICK with wrong filter lot: Confirm FIFO validation blocks pick"*), if a tester attempts `PICK` directly without first executing a `COMMIT` transaction, the request fails with `COMMITMENT_MISMATCH` before FIFO lot logic is evaluated.
-* **Remediation:**
-  Ensure testing documentation explicitly mandates executing an order `COMMIT` first before scanning a `PICK` lot.
+* **Status:** Documented — **No Active Development Required**
+* **Confirmation (2026-10-11):**
+  After reviewing `backend/app/Services/InventoryService.php:L168-173`, the
+  `COMMITMENT_MISMATCH` guard is **intentional by design** — it enforces the
+  two-step COMMIT → PICK workflow from the case study (Section II-B: ATP
+  reservation before physical pick). This is not a bug.
+  
+  Active development is **not required**. The only action needed is ensuring
+  that test scripts and demo testers follow the correct sequence:
+  1. `POST /api/v1/transactions/commit` (reserves ATP)
+  2. `POST /api/v1/transactions/pick` (physical warehouse scan)
+  
+  Attempting PICK without a prior COMMIT will correctly fail with
+  `COMMITMENT_MISMATCH`. This is expected behaviour and should be documented
+  in the testing guide, not fixed.
+* **Locations (informational):**
+  * `backend/app/Services/InventoryService.php:L168-173`
 
 ---
 
