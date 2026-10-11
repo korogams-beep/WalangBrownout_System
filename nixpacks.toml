@@ -1,0 +1,23 @@
+# nixpacks.toml
+# ISSUE-004: Override the start command so Nixpacks never falls back to
+#            `npx serve`, which hangs waiting for interactive TTY input.
+# ISSUE-005: Disable Nixpacks build-cache so environment variables set in
+#            the Railway dashboard are always picked up during the build phase
+#            instead of being baked in from a stale cached layer.
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+# `serve -s dist -l $PORT` runs a production-grade static file server.
+# The `-s` flag enables SPA mode (all 404s → index.html).
+# `$PORT` is injected by Railway at runtime — no hardcoded port.
+# `--no-clipboard` + `--no-port-switching` make it fully non-interactive
+# so it never hangs waiting for terminal input (fixes ISSUE-004).
+cmd = "npx serve -s dist -l $PORT --no-clipboard"
