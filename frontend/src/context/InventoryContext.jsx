@@ -1,3 +1,16 @@
+/**
+ * InventoryContext.jsx
+ *
+ * ISSUE-001 / ISSUE-003 note:
+ *   This context currently seeds from static mockData (frontend-only mode).
+ *   When the backend integration is enabled, swap `buildInitialState` to call
+ *   `apiGetProducts()` and `apiGetInventory()` from src/services/api.js, and
+ *   replace dispatch actions with the corresponding API calls.
+ *   The normaliseProduct() adapter in api.js already handles the backend
+ *   product-ID format (AC-PORT-01, FILT-CARBON-01, etc.) and maps
+ *   snake_case → camelCase so no further changes are needed in the UI components.
+ */
+
 import { createContext, useContext, useMemo, useReducer } from 'react';
 import { mockProducts } from '../data/mockData.js';
 import {
@@ -24,8 +37,16 @@ function makeTransactionId() {
 function makeBatchId(productId) {
   return `BATCH-${productId}-${String(nextBatchId++).padStart(3, '0')}`;
 }
+/**
+ * Generates a reorder-rule ID from a product ID.
+ *
+ * ISSUE-003 fix: previously assumed all product IDs used the "PID-" prefix
+ * (e.g. "PID-001" → "ROZ-001"). The backend uses descriptive IDs like
+ * "AC-PORT-01" or "FILT-CARBON-01", so we now just prefix with "ROZ-"
+ * directly — no stripping needed.
+ */
 function makeRuleId(productId) {
-  return `ROZ-${productId.replace('PID-', '')}`;
+  return `ROZ-${productId}`;
 }
 
 // Applies a transaction's real inventory effect the moment it reaches its

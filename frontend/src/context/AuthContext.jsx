@@ -24,12 +24,15 @@ export const ROLE_OPTIONS = ['admin', 'manager', 'staff'];
 
 // In-memory user registry default seed — includes standard demo accounts
 // and backend testing accounts so either set of credentials works out of the box.
+// ISSUE-002 fix: added 'manager' to INITIAL_USERS and ROLE_OPTIONS now
+// matches the backend enum ('admin' | 'manager' | 'staff').
 const INITIAL_USERS = [
-  { username: 'admin', password: 'admin123', role: 'admin', active: true },
-  { username: 'manager1', password: 'manager123', role: 'manager', active: true },
-  { username: 'staff1', password: 'staff123', role: 'staff', active: true },
-  { username: 'admin@walangbrownout.com', password: 'Admin@WB2026!', role: 'admin', active: true },
-  { username: 'staff@walangbrownout.com', password: 'Staff@WB2026!', role: 'staff', active: true },
+  { username: 'admin',    password: 'admin123',    role: 'admin',   active: true },
+  { username: 'manager1', password: 'manager123',  role: 'manager', active: true },
+  { username: 'staff1',   password: 'staff123',    role: 'staff',   active: true },
+  { username: 'admin@walangbrownout.com',   password: 'Admin@WB2026!',   role: 'admin',   active: true },
+  { username: 'manager@walangbrownout.com', password: 'Manager@WB2026!', role: 'manager', active: true },
+  { username: 'staff@walangbrownout.com',   password: 'Staff@WB2026!',   role: 'staff',   active: true },
 ];
 
 const USERS_STORAGE_KEY = 'wb_registered_users';

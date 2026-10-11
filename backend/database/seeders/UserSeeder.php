@@ -21,6 +21,17 @@ class UserSeeder extends Seeder
             ]
         );
 
+        // Manager account — can view all modules, add transactions, and change status
+        User::updateOrCreate(
+            ['email' => 'manager@walangbrownout.com'],
+            [
+                'name'     => 'Inventory Manager',
+                'email'    => 'manager@walangbrownout.com',
+                'password' => Hash::make('Manager@WB2026!'),
+                'role'     => 'manager',
+            ]
+        );
+
         // Staff account — daily operations (receive stock, commit orders, pick batches)
         User::updateOrCreate(
             ['email' => 'staff@walangbrownout.com'],
@@ -52,6 +63,6 @@ class UserSeeder extends Seeder
             );
         }
 
-        $this->command->info('  Users seeded: 2 system accounts + 4 team member accounts.');
+        $this->command->info('  Users seeded: 3 system accounts (admin, manager, staff) + 4 team member accounts.');
     }
 }
