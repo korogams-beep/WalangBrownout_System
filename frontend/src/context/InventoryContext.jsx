@@ -18,9 +18,16 @@ import {
   apiGetInventory,
   apiGetBatches,
   apiGetTransactions,
+  apiGetSuppliers,
   apiCreateProduct,
   apiUpdateProduct,
   apiDeleteProduct,
+  apiCreateTransaction,
+  apiUpdateTransaction,
+  apiDeleteTransaction,
+  apiCreateSupplier,
+  apiUpdateSupplier,
+  apiDeleteSupplier,
   apiCommit,
   apiPick,
   apiReceiveBatch,
@@ -173,7 +180,7 @@ function buildInitialState() {
 function reducer(state, action) {
   switch (action.type) {
     case 'SET_DATA_FROM_API': {
-      const { products, inventory, batches, transactions } = action.payload;
+      const { products, inventory, batches, transactions, suppliers } = action.payload;
       const classifiedProducts = products.map((p) => ({
         ...p,
         productClass: classifyProduct(p),
@@ -196,6 +203,7 @@ function reducer(state, action) {
         inventory: invMap,
         ...(batches && batches.length ? { batches } : {}),
         ...(transactions && transactions.length ? { transactions } : {}),
+        ...(suppliers && suppliers.length ? { suppliers } : {}),
         reorderRules: rules,
       };
     }
@@ -355,9 +363,39 @@ function reducer(state, action) {
       };
     }
 
+    case 'DELETE_TRANSACTION': {
+      const { transactionId } = action.payload;
+      return {
+        ...state,
+        transactions: state.transactions.filter((t) => t.id !== transactionId),
+      };
+    }
+
+    case 'EDIT_TRANSACTION': {
+      const { transaction } = action.payload;
+      return {
+        ...state,
+        transactions: state.transactions.map((t) =>
+          t.id === transaction.id ? { ...t, ...transaction } : t
+        ),
+      };
+    }
+
+    case 'SET_TRANSACTIONS': {
+      const { transactions } = action.payload;
+      return {
+        ...state,
+        transactions: transactions || state.transactions,
+      };
+    }
+
     case 'ADD_SUPPLIER': {
       const { supplier } = action.payload;
-      return { ...state, suppliers: [...state.suppliers, { ...supplier, id: makeSupplierId() }] };
+      const id = supplier.id || makeSupplierId();
+      return {
+        ...state,
+        suppliers: [...state.suppliers.filter((s) => s.id !== id), { ...supplier, id }],
+      };
     }
 
     case 'EDIT_SUPPLIER': {
@@ -381,17 +419,18 @@ function reducer(state, action) {
 export function InventoryProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, undefined, buildInitialState);
 
-  // Sync live products and inventory from MySQL API on mount
+  // Sync live products, inventory, transactions, and suppliers from MySQL API on mount
   useEffect(() => {
     let mounted = true;
 
     async function fetchFromMySQL() {
       try {
-        const [prods, invs, batches, txns] = await Promise.allSettled([
+        const [prods, invs, batches, txns, supps] = await Promise.allSettled([
           apiGetProducts(),
           apiGetInventory(),
           apiGetBatches(),
           apiGetTransactions(),
+          apiGetSuppliers(),
         ]);
 
         if (
@@ -406,12 +445,13 @@ export function InventoryProvider({ children }) {
               products: prods.value,
               inventory: invs.status === 'fulfilled' ? invs.value : null,
               batches: batches.status === 'fulfilled' ? batches.value : null,
-              transactions: txns.status === 'fulfilled' ? txns.value : null,
+              transactions: txns.status === 'fulfilled' && Array.isArray(txns.value) ? txns.value : null,
+              suppliers: supps.status === 'fulfilled' && Array.isArray(supps.value) && supps.value.length > 0 ? supps.value : null,
             },
           });
         }
       } catch (err) {
-        // Keep initial mock seed if backend API is not yet reachable
+        // Keep initial seed if backend API is not yet reachable
       }
     }
 
@@ -467,7 +507,8 @@ export function InventoryProvider({ children }) {
             name: product.name,
             abcClass: abc,
             unitPrice: product.unitPrice,
-            unitCost: product.unitCost,
+            unitCost: product.unitCost ?? Math.round((product.unitPrice || 0) * 0.7),
+            qtyOnHand: product.qtyOnHand,
             isPerishable: Boolean(product.shelfLifeMonths),
             shelfLifeDays: product.shelfLifeMonths ? product.shelfLifeMonths * 30 : null,
           });
@@ -479,46 +520,75 @@ export function InventoryProvider({ children }) {
       regenerateReorderRules: () => dispatch({ type: 'REGENERATE_REORDER_RULES' }),
       createTransaction: async (payload) => {
         dispatch({ type: 'CREATE_TRANSACTION', payload });
-        if (payload.type === 'Sale') {
-          try {
-            await apiCommit({
-              product_id: payload.productId,
-              quantity: payload.qty,
-              order_reference: 'ORD-' + Date.now().toString().slice(-6),
-            });
-          } catch (err) {
-            console.warn('Order committed locally (MySQL sync warning):', err?.message || err);
+        try {
+          const created = await apiCreateTransaction(payload);
+          if (created?.id && created.id !== payload.id) {
+            const freshTxns = await apiGetTransactions();
+            if (freshTxns?.length) {
+              dispatch({ type: 'SET_TRANSACTIONS', payload: { transactions: freshTxns } });
+            }
           }
+        } catch (err) {
+          console.warn('Transaction created locally (MySQL sync warning):', err?.message || err);
         }
       },
       advanceTransaction: async (transactionId) => {
         const txn = state.transactions.find((t) => t.id === transactionId);
+        if (!txn) return;
+        const nextStatus = getNextStatus(txn.type, txn.status);
+        if (!nextStatus) return;
+
         dispatch({ type: 'ADVANCE_TRANSACTION', payload: { transactionId } });
-        if (txn) {
-          const nextStatus = getNextStatus(txn.type, txn.status);
-          if (nextStatus === STOCK_EFFECT_STEP[txn.type]) {
-            try {
-              if (txn.type === 'Orders') {
-                await apiReceiveBatch({
-                  productId: txn.productId,
-                  batchNumber: txn.batchId || ('LOT-' + Date.now().toString().slice(-6)),
-                  dateReceived: new Date().toISOString(),
-                  expiryDate: txn.expiryDate || null,
-                  qty: txn.qty,
-                  location: txn.location || 'Main Warehouse',
-                });
-              }
-            } catch (err) {
-              console.warn('Advanced transaction locally (MySQL sync warning):', err?.message || err);
-            }
-          }
+        try {
+          await apiUpdateTransaction(transactionId, { status: nextStatus });
+        } catch (err) {
+          console.warn('Advanced transaction locally (MySQL sync warning):', err?.message || err);
         }
       },
-      addSupplier: (supplier) => dispatch({ type: 'ADD_SUPPLIER', payload: { supplier } }),
-      editSupplier: (supplier) => dispatch({ type: 'EDIT_SUPPLIER', payload: { supplier } }),
-      deleteSupplier: (supplierId) => dispatch({ type: 'DELETE_SUPPLIER', payload: { supplierId } }),
+      editTransaction: async (transaction) => {
+        dispatch({ type: 'EDIT_TRANSACTION', payload: { transaction } });
+        try {
+          await apiUpdateTransaction(transaction.id, transaction);
+        } catch (err) {
+          console.warn('Transaction edited locally (MySQL sync warning):', err?.message || err);
+        }
+      },
+      deleteTransaction: async (transactionId) => {
+        dispatch({ type: 'DELETE_TRANSACTION', payload: { transactionId } });
+        try {
+          await apiDeleteTransaction(transactionId);
+        } catch (err) {
+          console.warn('Transaction deleted locally (MySQL sync warning):', err?.message || err);
+        }
+      },
+      addSupplier: async (supplier) => {
+        try {
+          const created = await apiCreateSupplier(supplier);
+          dispatch({ type: 'ADD_SUPPLIER', payload: { supplier: created } });
+          return created;
+        } catch (err) {
+          console.warn('Supplier created locally (MySQL sync warning):', err?.message || err);
+          dispatch({ type: 'ADD_SUPPLIER', payload: { supplier } });
+        }
+      },
+      editSupplier: async (supplier) => {
+        dispatch({ type: 'EDIT_SUPPLIER', payload: { supplier } });
+        try {
+          await apiUpdateSupplier(supplier.id, supplier);
+        } catch (err) {
+          console.warn('Supplier updated locally (MySQL sync warning):', err?.message || err);
+        }
+      },
+      deleteSupplier: async (supplierId) => {
+        dispatch({ type: 'DELETE_SUPPLIER', payload: { supplierId } });
+        try {
+          await apiDeleteSupplier(supplierId);
+        } catch (err) {
+          console.warn('Supplier deleted locally (MySQL sync warning):', err?.message || err);
+        }
+      },
     }),
-    []
+    [state.transactions]
   );
 
   const value = useMemo(() => ({ ...state, ...actions }), [state, actions]);

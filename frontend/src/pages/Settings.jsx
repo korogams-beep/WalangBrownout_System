@@ -127,25 +127,32 @@ export default function Settings() {
     setSupplierForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleSupplierSubmit(e) {
+  async function handleSupplierSubmit(e) {
     e.preventDefault();
     setSupplierError('');
     if (!supplierForm.name.trim()) {
       setSupplierError('Supplier name is required.');
       return;
     }
-    if (supplierModal === 'add') {
-      addSupplier({ ...supplierForm });
-    } else {
-      editSupplier({ ...supplierModal, ...supplierForm });
+    try {
+      if (supplierModal === 'add') {
+        await addSupplier({ ...supplierForm });
+      } else {
+        await editSupplier({ ...supplierModal, ...supplierForm });
+      }
+      setSupplierModal(null);
+    } catch (err) {
+      setSupplierError(err?.message || 'Failed to save supplier.');
     }
-    setSupplierModal(null);
   }
 
-  function handleDeleteSupplierConfirm() {
+  async function handleDeleteSupplierConfirm() {
     if (deleteSupplierTarget) {
-      deleteSupplier(deleteSupplierTarget.id);
-      setDeleteSupplierTarget(null);
+      try {
+        await deleteSupplier(deleteSupplierTarget.id);
+      } finally {
+        setDeleteSupplierTarget(null);
+      }
     }
   }
 

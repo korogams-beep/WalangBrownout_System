@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\v1\UserController;
 use App\Http\Controllers\Api\v1\ProductController;
 use App\Http\Controllers\Api\v1\InventoryController;
 use App\Http\Controllers\Api\v1\BatchController;
+use App\Http\Controllers\Api\v1\SupplierController;
 use App\Http\Controllers\Api\v1\OrderTransactionController;
 use App\Http\Controllers\Api\v1\ReorderAlertController;
 
@@ -93,16 +94,27 @@ Route::prefix('v1')->group(function () {
             Route::delete('/{batchId}',       [BatchController::class, 'destroy']);
         });
 
+        // ── Suppliers ─────────────────────────────────────────────────────────
+        Route::apiResource('suppliers', SupplierController::class);
+
         // ── Transactions (Inventory Triggers) ─────────────────────────────────
         // POST /api/v1/transactions/commit  → online checkout reservation (ATP check)
         // POST /api/v1/transactions/pick    → warehouse FIFO barcode scan
         // POST /api/v1/transactions/adjust  → cycle count reconciliation
-        // GET  /api/v1/transactions         → paginated audit log (filterable)
+        // GET  /api/v1/transactions         → list all transactions
+        // POST /api/v1/transactions         → create new transaction
+        // GET  /api/v1/transactions/{id}    → get single transaction
+        // PUT  /api/v1/transactions/{id}    → update / advance transaction status
+        // DELETE /api/v1/transactions/{id} → delete transaction
         Route::prefix('transactions')->group(function () {
             Route::post('/commit',  [OrderTransactionController::class, 'commitOrder']);
             Route::post('/pick',    [OrderTransactionController::class, 'pickBarcode']);
             Route::post('/adjust',  [OrderTransactionController::class, 'adjustCount']);
             Route::get('/',         [OrderTransactionController::class, 'index']);
+            Route::post('/',        [OrderTransactionController::class, 'store']);
+            Route::get('/{id}',     [OrderTransactionController::class, 'show']);
+            Route::put('/{id}',     [OrderTransactionController::class, 'update']);
+            Route::delete('/{id}',  [OrderTransactionController::class, 'destroy']);
         });
 
         // ── Alerts ────────────────────────────────────────────────────────────

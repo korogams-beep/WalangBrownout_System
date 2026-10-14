@@ -356,13 +356,86 @@ export async function apiGetInventory() {
 // ---------------------------------------------------------------------------
 
 /**
+ * Normalises a transaction record from MySQL to frontend camelCase shape.
+ */
+export function normaliseTransaction(t) {
+  const type =
+    t.type ||
+    (t.transaction_type === 'RECEIVE'
+      ? 'Orders'
+      : t.transaction_type === 'COMMIT' || t.transaction_type === 'PICK'
+      ? 'Sale'
+      : 'Orders');
+  return {
+    id: t.id || t.transaction_id,
+    type,
+    status: t.status || 'Completed',
+    productId: t.productId || t.product_id,
+    productName: t.productName || t.product?.name || t.product_id,
+    qty: Number(t.qty ?? t.quantity ?? Math.abs(t.quantity_changed ?? 0)),
+    location: t.location || null,
+    expiryDate: t.expiryDate || t.expiry_date || null,
+    batchId: t.batchId || t.batch_id || null,
+    supplierId: t.supplierId || t.supplier_id || null,
+    supplier: t.supplier || null,
+    dateTime: t.dateTime || t.created_at || new Date().toISOString(),
+  };
+}
+
+/**
  * GET /transactions
  *
  * @returns {Promise<object[]>}
  */
 export async function apiGetTransactions() {
   const { data } = await api.get('/transactions');
-  return data.data ?? data ?? [];
+  const list = data.data ?? data;
+  return Array.isArray(list) ? list.map(normaliseTransaction) : [];
+}
+
+/**
+ * POST /transactions
+ * Creates a new transaction directly in MySQL.
+ */
+export async function apiCreateTransaction(payload) {
+  const { data } = await api.post('/transactions', {
+    id: payload.id,
+    productId: payload.productId || payload.product_id,
+    type: payload.type,
+    status: payload.status || 'Open',
+    qty: payload.qty || payload.quantity,
+    location: payload.location,
+    expiryDate: payload.expiryDate,
+    supplierId: payload.supplierId || payload.supplier_id,
+    notes: payload.notes,
+  });
+  return normaliseTransaction(data.data ?? data);
+}
+
+/**
+ * PUT /transactions/:id
+ * Updates or advances transaction status in MySQL.
+ */
+export async function apiUpdateTransaction(id, payload) {
+  const { data } = await api.put(`/transactions/${id}`, {
+    status: payload.status,
+    qty: payload.qty || payload.quantity,
+    type: payload.type,
+    location: payload.location,
+    expiryDate: payload.expiryDate,
+    supplierId: payload.supplierId || payload.supplier_id,
+    notes: payload.notes,
+  });
+  return normaliseTransaction(data.data ?? data);
+}
+
+/**
+ * DELETE /transactions/:id
+ * Deletes transaction from MySQL and rolls back unfulfilled reservations.
+ */
+export async function apiDeleteTransaction(id) {
+  const { data } = await api.delete(`/transactions/${id}`);
+  return data;
 }
 
 /**
@@ -394,6 +467,75 @@ export async function apiPick(payload) {
  */
 export async function apiAdjust(payload) {
   const { data } = await api.post('/transactions/adjust', payload);
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Supplier endpoints (Supplier Management — MySQL)
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalises a raw supplier record from MySQL.
+ */
+export function normaliseSupplier(s) {
+  return {
+    id: s.id,
+    name: s.name,
+    contactPerson: s.contact_person ?? s.contactPerson ?? '',
+    phone: s.phone ?? '',
+    email: s.email ?? '',
+    address: s.address ?? '',
+    createdAt: s.created_at ?? s.createdAt,
+  };
+}
+
+/**
+ * GET /suppliers
+ * Returns all suppliers from MySQL.
+ */
+export async function apiGetSuppliers() {
+  const { data } = await api.get('/suppliers');
+  const list = data.data ?? data;
+  return Array.isArray(list) ? list.map(normaliseSupplier) : [];
+}
+
+/**
+ * POST /suppliers
+ * Admin adds a new supplier into MySQL.
+ */
+export async function apiCreateSupplier(payload) {
+  const { data } = await api.post('/suppliers', {
+    id: payload.id,
+    name: payload.name,
+    contact_person: payload.contactPerson || payload.contact_person || '',
+    phone: payload.phone || '',
+    email: payload.email || '',
+    address: payload.address || '',
+  });
+  return normaliseSupplier(data.data ?? data);
+}
+
+/**
+ * PUT /suppliers/:id
+ * Admin/Manager updates a supplier in MySQL.
+ */
+export async function apiUpdateSupplier(id, payload) {
+  const { data } = await api.put(`/suppliers/${id}`, {
+    name: payload.name,
+    contact_person: payload.contactPerson !== undefined ? payload.contactPerson : payload.contact_person,
+    phone: payload.phone,
+    email: payload.email,
+    address: payload.address,
+  });
+  return normaliseSupplier(data.data ?? data);
+}
+
+/**
+ * DELETE /suppliers/:id
+ * Admin deletes a supplier from MySQL.
+ */
+export async function apiDeleteSupplier(id) {
+  const { data } = await api.delete(`/suppliers/${id}`);
   return data;
 }
 

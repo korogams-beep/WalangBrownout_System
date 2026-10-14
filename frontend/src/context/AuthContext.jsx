@@ -456,6 +456,8 @@ export function usePermissions() {
     canAddAccount: role === 'admin',
     canManageReorderRules: role === 'admin',
     canAddTransaction: role === 'admin' || role === 'manager',
+    canEditTransaction: role === 'admin' || role === 'manager',
+    canDeleteTransaction: role === 'admin',
     canChangeTransactionStatus: role === 'admin' || role === 'manager' || role === 'staff',
   };
 }

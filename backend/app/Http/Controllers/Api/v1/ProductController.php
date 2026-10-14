@@ -100,6 +100,19 @@ class ProductController extends Controller
             'safety_stock'       => $validated['safety_stock'] ?? 10,
         ]);
 
+        if ($product->is_perishable && ($validated['initial_stock'] ?? 0) > 0) {
+            \App\Models\Batch::create([
+                'batch_id'          => 'BATCH-' . $productId . '-001',
+                'product_id'        => $productId,
+                'batch_number'      => 'LOT-' . strtoupper(Str::random(6)),
+                'date_received'     => now()->toDateString(),
+                'expiry_date'       => now()->addDays($product->shelf_life_days ?: 270)->toDateString(),
+                'quantity_received' => $validated['initial_stock'],
+                'quantity_remains'  => $validated['initial_stock'],
+                'bin_location'      => 'Cold Storage A-1',
+            ]);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Product created successfully.',
@@ -148,6 +161,16 @@ class ProductController extends Controller
         ]);
 
         $product->update($validated);
+
+        if ($request->has('qty_on_hand') || $request->has('initial_stock') || $request->has('quantity_on_hand')) {
+            $qty = $request->input('qty_on_hand', $request->input('initial_stock', $request->input('quantity_on_hand')));
+            if ($qty !== null) {
+                Inventory::updateOrCreate(
+                    ['product_id' => $productId],
+                    ['quantity_on_hand' => (int)$qty]
+                );
+            }
+        }
 
         return response()->json([
             'success' => true,
