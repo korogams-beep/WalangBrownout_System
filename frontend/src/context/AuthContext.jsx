@@ -10,8 +10,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 export const ROLE_HOME = {
   admin: '/dashboard',
-  manager: '/transactions',
-  staff: '/transactions',
+  manager: '/dashboard',
+  staff: '/dashboard',
 };
 
 export const ROLE_LABEL = {

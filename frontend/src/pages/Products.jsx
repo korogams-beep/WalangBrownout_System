@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader.jsx';
 import Card from '../components/ui/Card.jsx';
 import DataTable from '../components/ui/DataTable.jsx';
@@ -11,10 +11,19 @@ import { getSoonestExpiringBatch, getLastUpdated } from '../utils/inventoryLogic
 import styles from './ListPage.module.css';
 import productStyles from './Products.module.css';
 
+const SORT_OPTIONS = [
+  { label: 'Alphabetical (A–Z)',    value: 'alpha' },
+  { label: 'By Expiration Date',    value: 'expiry' },
+  { label: 'ABC Category',          value: 'category' },
+];
+
 export default function Products() {
   const { products, inventory, batches, transactions, deleteProduct } = useInventory();
   const { canAddProduct, canEditProduct, canDeleteProduct } = usePermissions();
-  const [query, setQuery] = useState('');
+  const [query, setQuery]       = useState('');
+  const [sortBy, setSortBy]     = useState('');
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef(null);
 
   // Modal state — null = closed, 'add' = add mode, product object = edit mode
   const [modalState, setModalState] = useState(null);
@@ -24,13 +33,13 @@ export default function Products() {
 
   const rows = useMemo(() => {
     return products.map((product) => {
-      const inv = inventory[product.id] || { qtyOnHand: 0, qtyCommitted: 0 };
+      const inv   = inventory[product.id] || { qtyOnHand: 0, qtyCommitted: 0 };
       const batch = getSoonestExpiringBatch(batches, product.id);
       return {
         ...product,
-        qtyOnHand: inv.qtyOnHand,
+        qtyOnHand:   inv.qtyOnHand,
         qtyCommitted: inv.qtyCommitted,
-        expiryDate: batch ? batch.expiryDate : null,
+        expiryDate:  batch ? batch.expiryDate : null,
         lastUpdated: getLastUpdated(transactions, product.id),
       };
     });
@@ -38,9 +47,31 @@ export default function Products() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
-  }, [rows, query]);
+    let result = q
+      ? rows.filter((p) => p.name.toLowerCase().includes(q))
+      : [...rows];
+
+    // Sort
+    if (sortBy === 'alpha') {
+      result = result.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'expiry') {
+      result = result.sort((a, b) => {
+        if (!a.expiryDate && !b.expiryDate) return 0;
+        if (!a.expiryDate) return 1;
+        if (!b.expiryDate) return -1;
+        return new Date(a.expiryDate) - new Date(b.expiryDate);
+      });
+    } else if (sortBy === 'category') {
+      result = result.sort((a, b) => a.category.localeCompare(b.category));
+    }
+
+    return result;
+  }, [rows, query, sortBy]);
+
+  function handleSortSelect(value) {
+    setSortBy(value);
+    setSortOpen(false);
+  }
 
   function handleDeleteConfirm() {
     if (deleteTarget) {
@@ -51,14 +82,22 @@ export default function Products() {
 
   const editTarget = modalState && modalState !== 'add' ? modalState : null;
 
+  const currentSortLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label ?? 'Sort By';
+
   return (
     <div>
       <PageHeader
         title="Product"
         searchValue={query}
         onSearchChange={setQuery}
-        searchPlaceholder="Search by name or id"
-        onSortClick={() => {}}
+        searchPlaceholder="Search by name"
+        sortLabel={currentSortLabel}
+        sortActive={!!sortBy}
+        sortOpen={sortOpen}
+        sortOptions={SORT_OPTIONS}
+        onSortToggle={() => setSortOpen((prev) => !prev)}
+        onSortSelect={handleSortSelect}
+        sortRef={sortRef}
       />
 
       <Card>
@@ -71,12 +110,13 @@ export default function Products() {
               header: 'Last Updated',
               render: (r) => (r.lastUpdated ? new Date(r.lastUpdated).toLocaleString() : '—'),
             },
-            { key: 'name', header: 'Product Name' },
+            { key: 'name',     header: 'Product Name' },
             { key: 'category', header: 'Category' },
+            { key: 'supplier', header: 'Supplier', render: (r) => r.supplier || '—' },
             { key: 'unitPrice', header: 'Unit Price', align: 'right', render: (r) => `₱${r.unitPrice}` },
-            { key: 'qtyOnHand', header: 'Quantity On Hand', align: 'right' },
-            { key: 'qtyCommitted', header: 'Quantity Committed', align: 'right' },
-            { key: 'warehouse', header: 'Warehouse Name' },
+            { key: 'qtyOnHand',    header: 'Quantity On Hand',    align: 'right' },
+            { key: 'qtyCommitted', header: 'Quantity Committed',  align: 'right' },
+            { key: 'warehouse',    header: 'Warehouse Name' },
             {
               key: 'shelfLifeMonths',
               header: 'Shelf Life',
@@ -128,7 +168,7 @@ export default function Products() {
         />
       </Card>
 
-      {/* Add Product button — visible to Admin only */}
+      {/* Add Product button — visible to Admin only, centered */}
       {canAddProduct && (
         <div className={styles.footerAction}>
           <Button
