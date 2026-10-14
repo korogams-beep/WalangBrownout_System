@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader.jsx';
 import Card from '../components/ui/Card.jsx';
 import DataTable from '../components/ui/DataTable.jsx';
@@ -12,12 +12,23 @@ import styles from './Transactions.module.css';
 
 const TYPE_FILTERS = ['All', ...TRANSACTION_TYPES];
 
+const SORT_OPTIONS = [
+  { label: 'Product Name (A–Z)',      value: 'name' },
+  { label: 'Transaction Date (Newest)', value: 'date_desc' },
+  { label: 'Transaction Date (Oldest)', value: 'date_asc' },
+  { label: 'Quantity (High–Low)',      value: 'qty_desc' },
+  { label: 'Quantity (Low–High)',      value: 'qty_asc' },
+];
+
 export default function Transactions() {
-  const { transactions, products, advanceTransaction } = useInventory(); // shared log — updates the instant any page dispatches an action
+  const { transactions, products, advanceTransaction } = useInventory();
   const { canAddTransaction, canChangeTransactionStatus } = usePermissions();
-  const [query, setQuery] = useState('');
+  const [query, setQuery]       = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sortBy, setSortBy]     = useState('');
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef(null);
 
   const rows = useMemo(() => {
     return transactions.map((t) => ({
@@ -27,14 +38,24 @@ export default function Transactions() {
   }, [transactions, products]);
 
   const filtered = useMemo(() => {
-    return rows
+    let result = rows
       .filter((t) => typeFilter === 'All' || t.type === typeFilter)
       .filter((t) => {
         const q = query.trim().toLowerCase();
         if (!q) return true;
-        return t.id.toLowerCase().includes(q) || t.productName.toLowerCase().includes(q);
+        return t.productName.toLowerCase().includes(q);
       });
-  }, [rows, query, typeFilter]);
+
+    if (sortBy === 'name')      result = [...result].sort((a, b) => a.productName.localeCompare(b.productName));
+    if (sortBy === 'date_desc') result = [...result].sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+    if (sortBy === 'date_asc')  result = [...result].sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+    if (sortBy === 'qty_desc')  result = [...result].sort((a, b) => b.qty - a.qty);
+    if (sortBy === 'qty_asc')   result = [...result].sort((a, b) => a.qty - b.qty);
+
+    return result;
+  }, [rows, query, typeFilter, sortBy]);
+
+  const currentSortLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label ?? 'Sort By';
 
   return (
     <div>
@@ -42,8 +63,14 @@ export default function Transactions() {
         title="Transactions"
         searchValue={query}
         onSearchChange={setQuery}
-        searchPlaceholder="Search transaction"
-        onSortClick={() => {}}
+        searchPlaceholder="Search by name"
+        sortLabel={currentSortLabel}
+        sortActive={!!sortBy}
+        sortOpen={sortOpen}
+        sortOptions={SORT_OPTIONS}
+        onSortToggle={() => setSortOpen((prev) => !prev)}
+        onSortSelect={(val) => { setSortBy(val); setSortOpen(false); }}
+        sortRef={sortRef}
       />
 
       <div className={styles.filterRow}>
@@ -66,12 +93,10 @@ export default function Transactions() {
           emptyMessage="No transactions for this filter yet."
           columns={[
             { key: 'id', header: 'Transaction ID' },
-            { key: 'dateTime', header: 'TransactionDate', render: (r) => new Date(r.dateTime).toLocaleString() },
+            { key: 'dateTime', header: 'Transaction Date', render: (r) => new Date(r.dateTime).toLocaleString() },
             { key: 'type', header: 'Type', render: (r) => <StatusBadge status={r.type} /> },
             { key: 'productName', header: 'Product Name' },
             { key: 'qty', header: 'Quantity', align: 'right' },
-            // Pipeline status — Orders go Open -> Ordered -> Received -> Completed;
-            // Sale/Returns go Open -> Picked -> Shipped -> Completed.
             { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} /> },
             {
               key: 'action',
@@ -80,8 +105,6 @@ export default function Transactions() {
               render: (r) => {
                 const next = getNextStatus(r.type, r.status);
                 if (!next) return null;
-                // Admin, Manager, and Staff can all advance a transaction's
-                // status — this is the one action Staff is allowed to do.
                 if (!canChangeTransactionStatus) return null;
                 return (
                   <Button variant="secondary" onClick={() => advanceTransaction(r.id)}>
@@ -94,13 +117,9 @@ export default function Transactions() {
         />
       </Card>
 
-      {/* Only Admin and Manager can create transactions — hidden entirely for Staff */}
       {canAddTransaction && (
         <div className={styles.actions}>
-          <Button
-            variant="accent"
-            onClick={() => setDrawerOpen(true)}
-          >
+          <Button variant="accent" onClick={() => setDrawerOpen(true)}>
             New Transaction
           </Button>
         </div>

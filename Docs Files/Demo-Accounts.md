@@ -13,8 +13,8 @@ These accounts are seeded into the MySQL database via `UserSeeder.php` (`php art
 | Role | Username / Email | Password | Default Landing Page | Primary Permissions |
 | :--- | :--- | :--- | :--- | :--- |
 | **System Administrator** | `admin@walangbrownout.com` | `Admin@WB2026!` | `/dashboard` | **Full Access** — Product Catalog CRUD, batch additions/deletions, inventory adjustments, reorder rules, and full audit logs. |
-| **Inventory Manager** | `manager@walangbrownout.com` | `Manager@WB2026!` | `/transactions` | **Manager Access** — View all modules, create new transactions, commit order reservations, and change transaction status. |
-| **Warehouse Staff** | `staff@walangbrownout.com` | `Staff@WB2026!` | `/transactions` | **Operations Access** — View inventory & lots, pick stock using FIFO barcode scanning, update transaction fulfillment status. |
+| **Inventory Manager** | `manager@walangbrownout.com` | `Manager@WB2026!` | `/dashboard` | **Manager Access** — View all modules, create new transactions, commit order reservations, and change transaction status. |
+| **Warehouse Staff** | `staff@walangbrownout.com` | `Staff@WB2026!` | `/dashboard` | **Operations Access** — View inventory & lots, pick stock using FIFO barcode scanning, update transaction fulfillment status. |
 
 ---
 
@@ -33,7 +33,7 @@ Individual team accounts configured for project grading and faculty demonstratio
 
 ## 3. Quick Demo Accounts (Offline / Mock Mode)
 
-For quick UI testing without requiring full backend connection or when running frontend mock mode:
+For quick UI testing without requiring full backend connection or when running frontend mock mode. Log in using **Username** (not email) on the login page.
 
 | Role | Username | Password |
 | :--- | :--- | :--- |
@@ -67,5 +67,5 @@ For quick UI testing without requiring full backend connection or when running f
    - **Railway Production:** `https://<your-frontend-domain>.up.railway.app`
    - **Local Dev:** `http://localhost:5173`
 2. Enter any of the credentials listed above.
-3. Upon authentication, you will be redirected to the respective module (`/dashboard` for Admin, `/transactions` for Manager and Staff).
+3. Upon authentication, you will be redirected to `/dashboard` regardless of role.
 4. The active role badge is displayed in the navigation sidebar.

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader.jsx';
 import Card from '../components/ui/Card.jsx';
 import DataTable from '../components/ui/DataTable.jsx';
@@ -7,19 +7,37 @@ import { useInventory } from '../context/InventoryContext.jsx';
 import { calculateATP, daysUntilExpiry, buildInventoryStatusRows } from '../utils/inventoryLogic.js';
 import styles from './Dashboard.module.css';
 
-// Layout + columns match the "UI Dashboard" sheet exactly: a main table
-// (Product Name / ATP / Seasonal / Current ROP / Days to Expiry / Fulfillment
-// Status) beside an "Inventory Monitoring Summary" panel (Total SKUs / Total
-// Inventory Value / Low Stock Alerts / Expiring Batches (<30 days)).
+const SORT_OPTIONS = [
+  { label: 'Product Name (A–Z)',    value: 'name' },
+  { label: 'Fulfillment Status',    value: 'status' },
+];
+
+// Status sort order: surface critical states first
+const STATUS_ORDER = { 'Critical': 0, 'Low': 1, 'Reorder': 2, 'OK': 3 };
+
 export default function Dashboard() {
   const { products, inventory, reorderRules, batches } = useInventory();
+  const [sortBy, setSortBy]     = useState('');
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef(null);
 
-  // Same row-builder used by the Analysis page's Stock Alerts panel, so the
-  // two pages never disagree on ATP / live ROP / fulfillment status.
   const rows = useMemo(
     () => buildInventoryStatusRows(products, inventory, reorderRules, batches),
     [products, inventory, reorderRules, batches]
   );
+
+  const sortedRows = useMemo(() => {
+    if (!sortBy) return rows;
+    return [...rows].sort((a, b) => {
+      if (sortBy === 'name')   return a.name.localeCompare(b.name);
+      if (sortBy === 'status') {
+        const oa = STATUS_ORDER[a.status] ?? 99;
+        const ob = STATUS_ORDER[b.status] ?? 99;
+        return oa !== ob ? oa - ob : a.name.localeCompare(b.name);
+      }
+      return 0;
+    });
+  }, [rows, sortBy]);
 
   const totalSkus = products.length;
   const totalInventoryValue = products.reduce((sum, p) => {
@@ -31,23 +49,33 @@ export default function Dashboard() {
     (b) => b.quantityRemains > 0 && daysUntilExpiry(b.expiryDate) <= 30
   ).length;
 
+  const currentSortLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label ?? 'Sort By';
+
   return (
     <div>
-      <PageHeader title="Dashboard" subtitle="Overview of WalangBrownout Inventory" onSortClick={() => {}} />
+      <PageHeader
+        title="Dashboard"
+        subtitle="Overview of WalangBrownout Inventory"
+        sortLabel={currentSortLabel}
+        sortActive={!!sortBy}
+        sortOpen={sortOpen}
+        sortOptions={SORT_OPTIONS}
+        onSortToggle={() => setSortOpen((prev) => !prev)}
+        onSortSelect={(val) => { setSortBy(val); setSortOpen(false); }}
+        sortRef={sortRef}
+      />
 
       <div className={styles.grid}>
         <Card title="Inventory Control Dashboard">
           <DataTable
             rowKey="productId"
-            rows={rows}
+            rows={sortedRows}
             columns={[
               { key: 'name', header: 'Product Name' },
               {
                 key: 'atp',
                 header: 'Available to Promise (ATP)',
                 align: 'right',
-                // ATP prevents phantom stock sales: e-commerce should always
-                // check this figure, never raw qtyOnHand (case study Section II-B).
                 render: (row) => {
                   const atp = calculateATP(row);
                   return <span className={atp <= 0 ? styles.atpDanger : undefined}>{atp}</span>;
