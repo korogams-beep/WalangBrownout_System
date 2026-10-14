@@ -166,7 +166,7 @@ export default function Settings() {
 
   async function handleDeleteAccountConfirm() {
     if (deleteAccountTarget) {
-      const result = await deleteUser(deleteAccountTarget.username, user);
+      const result = await deleteUser(deleteAccountTarget, user);
       if (result && !result.ok) {
         alert(result.message);
       }

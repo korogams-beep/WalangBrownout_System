@@ -34,10 +34,10 @@ export const ROLE_OPTIONS = ['admin', 'manager', 'staff'];
 
 // 4 Official System Demo Accounts
 const INITIAL_USERS = [
-  { username: 'Ais',     password: 'WB@Pnc2026!', role: 'admin',   active: true, email: 'ais@walangbrownout.com' },
-  { username: 'Brent',   password: 'WB@Pnc2026!', role: 'manager', active: true, email: 'brent@walangbrownout.com' },
-  { username: 'Emerson', password: 'WB@Pnc2026!', role: 'staff',   active: true, email: 'emerson@walangbrownout.com' },
-  { username: 'Ezra',    password: 'WB@Pnc2026!', role: 'staff',   active: true, email: 'ezra@walangbrownout.com' },
+  { id: 1, username: 'Ais',     password: 'WB@Pnc2026!', role: 'admin',   active: true, email: 'ais@walangbrownout.com' },
+  { id: 2, username: 'Brent',   password: 'WB@Pnc2026!', role: 'manager', active: true, email: 'brent@walangbrownout.com' },
+  { id: 3, username: 'Emerson', password: 'WB@Pnc2026!', role: 'staff',   active: true, email: 'emerson@walangbrownout.com' },
+  { id: 4, username: 'Ezra',    password: 'WB@Pnc2026!', role: 'staff',   active: true, email: 'ezra@walangbrownout.com' },
 ];
 
 const USERS_STORAGE_KEY = 'wb_users_v3';
@@ -363,33 +363,57 @@ export function AuthProvider({ children }) {
       },
 
       /**
-       * deleteUser(username, currentUser) — removes user from MySQL and local state.
+       * deleteUser(targetIdentifier, currentUser) — removes user from MySQL and local state.
        */
-      deleteUser: async (username, currentUser) => {
+      deleteUser: async (targetIdentifier, currentUser) => {
+        const username = typeof targetIdentifier === 'object'
+          ? (targetIdentifier.username || targetIdentifier.name)
+          : targetIdentifier;
+
+        const currentUsername = currentUser?.username || currentUser?.name;
         if (
-          currentUser &&
-          currentUser.username.toLowerCase() === username.toLowerCase()
+          currentUsername &&
+          username &&
+          currentUsername.toLowerCase() === username.toLowerCase()
         ) {
           return { ok: false, message: 'You cannot delete your own account.' };
         }
 
-        const target = registeredUsers.find(
-          (u) => u.username.toLowerCase() === username.toLowerCase()
-        );
+        const target = typeof targetIdentifier === 'object'
+          ? targetIdentifier
+          : registeredUsers.find(
+              (u) => (u.username || u.name || '').toLowerCase() === (username || '').toLowerCase()
+            );
 
-        // Sync to MySQL if ID exists
-        if (target?.id) {
-          try {
-            await apiDeleteUser(target.id);
-          } catch (err) {
+        const identifierToDelete = target?.id || target?.username || target?.email || username;
+
+        // 1. Delete from MySQL database
+        try {
+          await apiDeleteUser(identifierToDelete);
+        } catch (err) {
+          // If 404 (already gone from database), proceed to clean local state.
+          // Otherwise, if database threw an error (e.g. Ais cannot be deleted), abort!
+          if (err.response?.status !== 404) {
             const message = getApiErrorMessage(err, 'Failed to delete account from database.');
             return { ok: false, message };
           }
         }
 
+        // 2. Remove from local state
         setRegisteredUsers((prev) =>
-          prev.filter((u) => u.username.toLowerCase() !== username.toLowerCase())
+          prev.filter((u) => (u.username || u.name || '').toLowerCase() !== (username || '').toLowerCase())
         );
+
+        // 3. Immediately re-sync with MySQL to ensure exact parity
+        try {
+          const fresh = await apiGetUsers();
+          if (Array.isArray(fresh)) {
+            setRegisteredUsers(fresh);
+          }
+        } catch (e) {
+          // keep filtered state if fetch fails
+        }
+
         return { ok: true };
       },
     }),

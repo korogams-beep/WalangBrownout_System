@@ -73,11 +73,30 @@ class UserController extends Controller
     }
 
     /**
+     * Resolves a user by numeric ID, username, or email address.
+     */
+    protected function findUserByIdentifier(string|int $id): User
+    {
+        $user = is_numeric($id)
+            ? User::find((int) $id)
+            : User::where('name', $id)->orWhere('email', $id)->first();
+
+        if (! $user) {
+            abort(response()->json([
+                'success' => false,
+                'message' => 'User account not found in database.',
+            ], 404));
+        }
+
+        return $user;
+    }
+
+    /**
      * GET /api/v1/users/{id}
      */
-    public function show(int $id): JsonResponse
+    public function show(string|int $id): JsonResponse
     {
-        $user = User::findOrFail($id);
+        $user = $this->findUserByIdentifier($id);
 
         return response()->json([
             'success' => true,
@@ -90,9 +109,9 @@ class UserController extends Controller
      *
      * Updates an existing user's role, active status, name, or password.
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(Request $request, string|int $id): JsonResponse
     {
-        $user = User::findOrFail($id);
+        $user = $this->findUserByIdentifier($id);
 
         $validated = $request->validate([
             'name'     => 'nullable|string|max:100',
@@ -149,12 +168,12 @@ class UserController extends Controller
      *
      * Removes an account from MySQL.
      */
-    public function destroy(Request $request, int $id): JsonResponse
+    public function destroy(Request $request, string|int $id): JsonResponse
     {
-        $user = User::findOrFail($id);
+        $user = $this->findUserByIdentifier($id);
 
         // Prevent self-deletion
-        if ($request->user()->id === $user->id) {
+        if ($request->user() && $request->user()->id === $user->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'You cannot delete your own logged-in account.',
