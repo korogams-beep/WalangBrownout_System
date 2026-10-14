@@ -9,15 +9,10 @@
 nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm --prefix frontend install --include=dev"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["npm --prefix frontend run build"]
 
 [start]
-# `serve -s dist -l $PORT` runs a production-grade static file server.
-# The `-s` flag enables SPA mode (all 404s → index.html).
-# `$PORT` is injected by Railway at runtime — no hardcoded port.
-# `--no-clipboard` + `--no-port-switching` make it fully non-interactive
-# so it never hangs waiting for terminal input (fixes ISSUE-004).
-cmd = "npx serve -s dist -l $PORT --no-clipboard"
+cmd = "npx serve -s frontend/dist -l $PORT --no-clipboard"

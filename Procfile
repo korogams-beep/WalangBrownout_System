@@ -5,4 +5,4 @@
 # -s  SPA mode — unknown paths fall through to index.html (React Router)
 # -l  bind to the PORT env var injected by Railway / Heroku at runtime
 # --no-clipboard  non-interactive; do not try to copy the URL to a clipboard
-web: npx serve -s dist -l $PORT --no-clipboard
+web: npx serve -s frontend/dist -l $PORT --no-clipboard
