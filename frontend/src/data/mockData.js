@@ -46,8 +46,8 @@ export const mockProducts = [
     unitPrice: 349,
     qtyOnHand: 50,
     warehouse: 'Main Warehouse',
-    shelfLifeMonths: null,
-    isPerishable: false,
+    shelfLifeMonths: 9,
+    isPerishable: true,
     isSeasonal: false,
   },
 ];

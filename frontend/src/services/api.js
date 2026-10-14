@@ -364,13 +364,30 @@ export async function apiAdjust(payload) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Normalises a batch record from MySQL to frontend camelCase shape.
+ */
+export function normaliseBatch(b) {
+  return {
+    batchId: b.batch_id ?? b.batchId,
+    productId: b.product_id ?? b.productId,
+    batchNumber: b.batch_number ?? b.batchNumber,
+    dateReceived: b.date_received ?? b.dateReceived,
+    expiryDate: b.expiry_date ?? b.expiryDate,
+    quantityReceived: b.quantity_received ?? b.quantityReceived,
+    quantityRemains: b.quantity_remains ?? b.quantityRemains ?? 0,
+    binLocation: b.bin_location ?? b.binLocation,
+  };
+}
+
+/**
  * GET /batches
  *
  * @returns {Promise<object[]>}
  */
 export async function apiGetBatches() {
   const { data } = await api.get('/batches');
-  return data.data ?? data ?? [];
+  const list = data.data ?? data ?? [];
+  return Array.isArray(list) ? list.map(normaliseBatch) : [];
 }
 
 /**

@@ -2,36 +2,39 @@
 
 namespace Database\Seeders;
 
+use App\Models\Batch;
 use App\Models\Inventory;
 use App\Models\Product;
+use App\Models\Transaction;
 use Illuminate\Database\Seeder;
 
 class ProductSeeder extends Seeder
 {
     /*
     |--------------------------------------------------------------------------
-    | Product Catalog — Walang Brownout Appliances
+    | Product Catalog — Walang Brownout Appliances (Streamlined Demo Dataset)
     |--------------------------------------------------------------------------
-    | Based on the CCS112 Case Study Blueprint ABC classification:
-    |
-    |  CLASS A — High Value / High Demand
-    |    • Portable AC Units     → Seasonal (Summer Crunch prevention)
-    |    • Smart Thermostats     → Non-seasonal, steady high-value demand
-    |
-    |  CLASS B — Moderate Value / Moderate Demand
-    |    • Air Purifiers         → Non-seasonal, steady moderate demand
-    |    • Electric Fans         → Mildly seasonal, lower unit value
-    |
-    |  CLASS C — Low Value / Perishable / Consumable
-    |    • HEPA Replacement Filters   → Perishable, 270-day shelf life
-    |    • Carbon Replacement Filters → Perishable, 270-day shelf life (FIFO critical)
-    |    • AC Cleaning Kits           → Non-perishable consumable
+    | Contains the 4 core representative products across Category A, B, and C:
+    |   1. AC-PORT-01   (Class A, Seasonal AC Unit)
+    |   2. PURIF-AIR-01 (Class B, Air Purifier)
+    |   3. FILT-HEPA-01 (Class C, HEPA Replacement Filter - Out of stock demo)
+    |   4. CLEAN-AC-01  (Class C, AC Coil Cleaning Kit - 270 days shelf life)
     */
 
     public function run(): void
     {
-        $products = [
+        $keepIds = ['AC-PORT-01', 'PURIF-AIR-01', 'FILT-HEPA-01', 'CLEAN-AC-01'];
 
+        // Prune any legacy or excess products and related records
+        $removeIds = Product::whereNotIn('product_id', $keepIds)->pluck('product_id');
+        if ($removeIds->isNotEmpty()) {
+            Transaction::whereIn('product_id', $removeIds)->delete();
+            Batch::whereIn('product_id', $removeIds)->delete();
+            Inventory::whereIn('product_id', $removeIds)->delete();
+            Product::whereIn('product_id', $removeIds)->delete();
+        }
+
+        $products = [
             // ── CLASS A: Portable AC Units (Seasonal) ────────────────────────
             [
                 'product_id'              => 'AC-PORT-01',
@@ -48,53 +51,6 @@ class ProductSeeder extends Seeder
                 'initial_stock'           => 45,
                 'safety_stock'            => 20,
             ],
-            [
-                'product_id'              => 'AC-PORT-02',
-                'name'                    => 'Portable Air Conditioner 1.5HP',
-                'sku'                     => 'WB-AC-PORT-015HP',
-                'abc_class'               => 'A',
-                'unit_price'              => 24999.00,
-                'unit_cost'               => 18000.00,
-                'is_perishable'           => false,
-                'is_seasonal'             => true,
-                'shelf_life_days'         => null,
-                'supplier_lead_time_days' => 21,
-                'description'             => 'Portable 1.5HP inverter AC with auto-restart. Summer Crunch high-risk SKU.',
-                'initial_stock'           => 30,
-                'safety_stock'            => 15,
-            ],
-
-            // ── CLASS A: Smart Thermostats (Non-Seasonal) ─────────────────────
-            [
-                'product_id'              => 'THERM-SMART-01',
-                'name'                    => 'Smart WiFi Thermostat Pro',
-                'sku'                     => 'WB-THERM-WIFI-PRO',
-                'abc_class'               => 'A',
-                'unit_price'              => 4850.00,
-                'unit_cost'               => 3100.00,
-                'is_perishable'           => false,
-                'is_seasonal'             => false,
-                'shelf_life_days'         => null,
-                'supplier_lead_time_days' => 14,
-                'description'             => 'App-controlled smart thermostat, compatible with major AC brands.',
-                'initial_stock'           => 80,
-                'safety_stock'            => 25,
-            ],
-            [
-                'product_id'              => 'THERM-SMART-02',
-                'name'                    => 'Smart Thermostat Basic',
-                'sku'                     => 'WB-THERM-BASIC',
-                'abc_class'               => 'A',
-                'unit_price'              => 2299.00,
-                'unit_cost'               => 1450.00,
-                'is_perishable'           => false,
-                'is_seasonal'             => false,
-                'shelf_life_days'         => null,
-                'supplier_lead_time_days' => 14,
-                'description'             => 'Entry-level programmable thermostat with weekly scheduling.',
-                'initial_stock'           => 120,
-                'safety_stock'            => 30,
-            ],
 
             // ── CLASS B: Air Purifiers (Non-Seasonal) ─────────────────────────
             [
@@ -109,43 +65,11 @@ class ProductSeeder extends Seeder
                 'shelf_life_days'         => null,
                 'supplier_lead_time_days' => 14,
                 'description'             => 'True HEPA air purifier covering up to 30sqm. 3-stage filtration.',
-                'initial_stock'           => 60,
+                'initial_stock'           => 30,
                 'safety_stock'            => 15,
             ],
-            [
-                'product_id'              => 'PURIF-AIR-02',
-                'name'                    => 'HEPA Air Purifier 50sqm',
-                'sku'                     => 'WB-PURIF-HEPA-50',
-                'abc_class'               => 'B',
-                'unit_price'              => 11500.00,
-                'unit_cost'               => 7800.00,
-                'is_perishable'           => false,
-                'is_seasonal'             => false,
-                'shelf_life_days'         => null,
-                'supplier_lead_time_days' => 14,
-                'description'             => 'Premium HEPA air purifier for large rooms up to 50sqm.',
-                'initial_stock'           => 35,
-                'safety_stock'            => 10,
-            ],
 
-            // ── CLASS B: Electric Fans ────────────────────────────────────────
-            [
-                'product_id'              => 'FAN-STAND-01',
-                'name'                    => 'Industrial Stand Fan 18"',
-                'sku'                     => 'WB-FAN-STAND-18',
-                'abc_class'               => 'B',
-                'unit_price'              => 2199.00,
-                'unit_cost'               => 1350.00,
-                'is_perishable'           => false,
-                'is_seasonal'             => false,
-                'shelf_life_days'         => null,
-                'supplier_lead_time_days' => 10,
-                'description'             => '18-inch industrial stand fan, 5-speed control, 360° rotation.',
-                'initial_stock'           => 90,
-                'safety_stock'            => 20,
-            ],
-
-            // ── CLASS C: HEPA Replacement Filters (Perishable) ────────────────
+            // ── CLASS C: HEPA Replacement Filters (Perishable — Out of Stock) ─
             [
                 'product_id'              => 'FILT-HEPA-01',
                 'name'                    => 'HEPA Replacement Filter (30sqm)',
@@ -158,43 +82,11 @@ class ProductSeeder extends Seeder
                 'shelf_life_days'         => 270,
                 'supplier_lead_time_days' => 7,
                 'description'             => 'OEM HEPA replacement filter for PURIF-AIR-01. 270-day shelf life.',
-                'initial_stock'           => 0,   // stocked via BatchSeeder
+                'initial_stock'           => 0,
                 'safety_stock'            => 15,
             ],
-            [
-                'product_id'              => 'FILT-HEPA-02',
-                'name'                    => 'HEPA Replacement Filter (50sqm)',
-                'sku'                     => 'WB-FILT-HEPA-50',
-                'abc_class'               => 'C',
-                'unit_price'              => 1250.00,
-                'unit_cost'               => 750.00,
-                'is_perishable'           => true,
-                'is_seasonal'             => false,
-                'shelf_life_days'         => 270,
-                'supplier_lead_time_days' => 7,
-                'description'             => 'OEM HEPA replacement filter for PURIF-AIR-02. 270-day shelf life.',
-                'initial_stock'           => 0,
-                'safety_stock'            => 10,
-            ],
 
-            // ── CLASS C: Carbon Replacement Filters (Perishable — FIFO Critical)
-            [
-                'product_id'              => 'FILT-CARBON-01',
-                'name'                    => 'Carbon Replacement Filter (Universal)',
-                'sku'                     => 'WB-FILT-CARBON-UNI',
-                'abc_class'               => 'C',
-                'unit_price'              => 649.00,
-                'unit_cost'               => 380.00,
-                'is_perishable'           => true,
-                'is_seasonal'             => false,
-                'shelf_life_days'         => 270,
-                'supplier_lead_time_days' => 7,
-                'description'             => 'Universal carbon pre-filter. 270-day shelf life. FIFO enforcement active.',
-                'initial_stock'           => 0,
-                'safety_stock'            => 20,
-            ],
-
-            // ── CLASS C: AC Cleaning Kits (Non-Perishable Consumable) ──────────
+            // ── CLASS C: AC Cleaning Kits (Consumable) ────────────────────────
             [
                 'product_id'              => 'CLEAN-AC-01',
                 'name'                    => 'AC Coil Cleaning Kit',
@@ -202,12 +94,12 @@ class ProductSeeder extends Seeder
                 'abc_class'               => 'C',
                 'unit_price'              => 349.00,
                 'unit_cost'               => 190.00,
-                'is_perishable'           => false,
+                'is_perishable'           => true,
                 'is_seasonal'             => false,
-                'shelf_life_days'         => null,
+                'shelf_life_days'         => 270,
                 'supplier_lead_time_days' => 7,
-                'description'             => 'AC coil cleaner spray + brushes. No shelf life restriction.',
-                'initial_stock'           => 150,
+                'description'             => 'AC coil cleaner spray + brushes. 270-day shelf life.',
+                'initial_stock'           => 50,
                 'safety_stock'            => 30,
             ],
         ];
@@ -234,6 +126,6 @@ class ProductSeeder extends Seeder
             );
         }
 
-        $this->command->info('  Products seeded: 2× Class A Seasonal, 2× Class A Non-Seasonal, 3× Class B, 4× Class C.');
+        $this->command->info('  Streamlined products seeded: 4 core representative SKUs.');
     }
 }
