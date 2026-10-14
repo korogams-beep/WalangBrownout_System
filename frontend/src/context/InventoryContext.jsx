@@ -11,8 +11,20 @@
  *   snake_case → camelCase so no further changes are needed in the UI components.
  */
 
-import { createContext, useContext, useMemo, useReducer } from 'react';
+import { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 import { mockProducts } from '../data/mockData.js';
+import {
+  apiGetProducts,
+  apiGetInventory,
+  apiGetBatches,
+  apiGetTransactions,
+  apiCreateProduct,
+  apiUpdateProduct,
+  apiDeleteProduct,
+  apiCommit,
+  apiPick,
+  apiReceiveBatch,
+} from '../services/api.js';
 import {
   classifyProduct,
   isPerishable,
@@ -160,6 +172,34 @@ function buildInitialState() {
 
 function reducer(state, action) {
   switch (action.type) {
+    case 'SET_DATA_FROM_API': {
+      const { products, inventory, batches, transactions } = action.payload;
+      const classifiedProducts = products.map((p) => ({
+        ...p,
+        productClass: classifyProduct(p),
+        seasonal: isSeasonal(p),
+      }));
+      const invMap = { ...state.inventory };
+      if (inventory && Array.isArray(inventory)) {
+        inventory.forEach((inv) => {
+          invMap[inv.productId] = inv;
+        });
+      } else {
+        products.forEach((p) => {
+          invMap[p.id] = { productId: p.id, qtyOnHand: p.qtyOnHand, qtyCommitted: p.qtyCommitted || 0 };
+        });
+      }
+      const rules = classifiedProducts.map((p) => generateReorderRule(p, { id: makeRuleId(p.id) }));
+      return {
+        ...state,
+        products: classifiedProducts,
+        inventory: invMap,
+        ...(batches && batches.length ? { batches } : {}),
+        ...(transactions && transactions.length ? { transactions } : {}),
+        reorderRules: rules,
+      };
+    }
+
     case 'ADD_PRODUCT': {
       const { product } = action.payload;
       const startingQty = Number(product.qtyOnHand) || 0;
@@ -341,15 +381,139 @@ function reducer(state, action) {
 export function InventoryProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, undefined, buildInitialState);
 
+  // Sync live products and inventory from MySQL API on mount
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchFromMySQL() {
+      try {
+        const [prods, invs, batches, txns] = await Promise.allSettled([
+          apiGetProducts(),
+          apiGetInventory(),
+          apiGetBatches(),
+          apiGetTransactions(),
+        ]);
+
+        if (
+          mounted &&
+          prods.status === 'fulfilled' &&
+          Array.isArray(prods.value) &&
+          prods.value.length > 0
+        ) {
+          dispatch({
+            type: 'SET_DATA_FROM_API',
+            payload: {
+              products: prods.value,
+              inventory: invs.status === 'fulfilled' ? invs.value : null,
+              batches: batches.status === 'fulfilled' ? batches.value : null,
+              transactions: txns.status === 'fulfilled' ? txns.value : null,
+            },
+          });
+        }
+      } catch (err) {
+        // Keep initial mock seed if backend API is not yet reachable
+      }
+    }
+
+    fetchFromMySQL();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const actions = useMemo(
     () => ({
-      addProduct: (product) => dispatch({ type: 'ADD_PRODUCT', payload: { product } }),
-      deleteProduct: (productId) => dispatch({ type: 'DELETE_PRODUCT', payload: { productId } }),
-      editProduct: (product) => dispatch({ type: 'EDIT_PRODUCT', payload: { product } }),
+      addProduct: async (product) => {
+        dispatch({ type: 'ADD_PRODUCT', payload: { product } });
+        try {
+          const abc =
+            product.abcClass ||
+            (product.category?.includes('A') ? 'A' : product.category?.includes('B') ? 'B' : 'C');
+          await apiCreateProduct({
+            productId: product.id,
+            name: product.name,
+            sku:
+              product.sku ||
+              product.name.replace(/[^a-zA-Z0-9]/g, '-').toUpperCase().slice(0, 15) +
+                '-' +
+                Math.floor(1000 + Math.random() * 9000),
+            abcClass: abc,
+            unitPrice: product.unitPrice || 0,
+            unitCost: product.unitCost || Math.round((product.unitPrice || 0) * 0.7),
+            initialStock: product.qtyOnHand || 0,
+            isPerishable: Boolean(product.shelfLifeMonths),
+            shelfLifeDays: product.shelfLifeMonths ? product.shelfLifeMonths * 30 : null,
+            supplierLeadTimeDays: 14,
+          });
+        } catch (err) {
+          console.warn('Product saved locally (MySQL sync failed or offline):', err?.message || err);
+        }
+      },
+      deleteProduct: async (productId) => {
+        dispatch({ type: 'DELETE_PRODUCT', payload: { productId } });
+        try {
+          await apiDeleteProduct(productId);
+        } catch (err) {
+          console.warn('Product deleted locally (MySQL sync failed or offline):', err?.message || err);
+        }
+      },
+      editProduct: async (product) => {
+        dispatch({ type: 'EDIT_PRODUCT', payload: { product } });
+        try {
+          const abc =
+            product.abcClass ||
+            (product.category?.includes('A') ? 'A' : product.category?.includes('B') ? 'B' : 'C');
+          await apiUpdateProduct(product.id, {
+            name: product.name,
+            abcClass: abc,
+            unitPrice: product.unitPrice,
+            unitCost: product.unitCost,
+            isPerishable: Boolean(product.shelfLifeMonths),
+            shelfLifeDays: product.shelfLifeMonths ? product.shelfLifeMonths * 30 : null,
+          });
+        } catch (err) {
+          console.warn('Product updated locally (MySQL sync failed or offline):', err?.message || err);
+        }
+      },
       addReorderRule: (rule) => dispatch({ type: 'ADD_REORDER_RULE', payload: { rule } }),
       regenerateReorderRules: () => dispatch({ type: 'REGENERATE_REORDER_RULES' }),
-      createTransaction: (payload) => dispatch({ type: 'CREATE_TRANSACTION', payload }),
-      advanceTransaction: (transactionId) => dispatch({ type: 'ADVANCE_TRANSACTION', payload: { transactionId } }),
+      createTransaction: async (payload) => {
+        dispatch({ type: 'CREATE_TRANSACTION', payload });
+        if (payload.type === 'Sale') {
+          try {
+            await apiCommit({
+              product_id: payload.productId,
+              quantity: payload.qty,
+              order_reference: 'ORD-' + Date.now().toString().slice(-6),
+            });
+          } catch (err) {
+            console.warn('Order committed locally (MySQL sync warning):', err?.message || err);
+          }
+        }
+      },
+      advanceTransaction: async (transactionId) => {
+        const txn = state.transactions.find((t) => t.id === transactionId);
+        dispatch({ type: 'ADVANCE_TRANSACTION', payload: { transactionId } });
+        if (txn) {
+          const nextStatus = getNextStatus(txn.type, txn.status);
+          if (nextStatus === STOCK_EFFECT_STEP[txn.type]) {
+            try {
+              if (txn.type === 'Orders') {
+                await apiReceiveBatch({
+                  productId: txn.productId,
+                  batchNumber: txn.batchId || ('LOT-' + Date.now().toString().slice(-6)),
+                  dateReceived: new Date().toISOString(),
+                  expiryDate: txn.expiryDate || null,
+                  qty: txn.qty,
+                  location: txn.location || 'Main Warehouse',
+                });
+              }
+            } catch (err) {
+              console.warn('Advanced transaction locally (MySQL sync warning):', err?.message || err);
+            }
+          }
+        }
+      },
       addSupplier: (supplier) => dispatch({ type: 'ADD_SUPPLIER', payload: { supplier } }),
       editSupplier: (supplier) => dispatch({ type: 'EDIT_SUPPLIER', payload: { supplier } }),
       deleteSupplier: (supplierId) => dispatch({ type: 'DELETE_SUPPLIER', payload: { supplierId } }),

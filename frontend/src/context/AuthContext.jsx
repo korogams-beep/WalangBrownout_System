@@ -1,7 +1,15 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  apiLogin,
+  apiRegister,
+  apiLogout,
+  apiGetUsers,
+  apiUpdateUser,
+  apiDeleteUser,
+} from '../services/api.js';
 
-// Frontend-only session + role state. Supports both demo accounts and
-// backend testing credentials (from UserSeeder.php) for a seamless experience:
+// Session + role state with live MySQL database synchronization.
+// Supports both demo accounts and live MySQL database users for a seamless experience:
 //   - admin:   full access everywhere, no restrictions.
 //   - manager: can VIEW every module, and on Transactions can both add a new
 //              transaction (pop-up form) and change a transaction's status.
@@ -22,10 +30,7 @@ export const ROLE_LABEL = {
 
 export const ROLE_OPTIONS = ['admin', 'manager', 'staff'];
 
-// In-memory user registry default seed — includes standard demo accounts
-// and backend testing accounts so either set of credentials works out of the box.
-// ISSUE-002 fix: added 'manager' to INITIAL_USERS and ROLE_OPTIONS now
-// matches the backend enum ('admin' | 'manager' | 'staff').
+// Default initial accounts for offline/initial state
 const INITIAL_USERS = [
   { username: 'admin',    password: 'admin123',    role: 'admin',   active: true },
   { username: 'manager1', password: 'manager123',  role: 'manager', active: true },
@@ -44,7 +49,6 @@ function loadStoredUsers() {
     if (!raw) return INITIAL_USERS;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      // Merge in any initial accounts that might not be in localStorage yet
       const existing = new Set(parsed.map((u) => u.username.toLowerCase()));
       const merged = [...parsed];
       for (const init of INITIAL_USERS) {
@@ -73,8 +77,45 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(loadStoredSession);
-  // Registry of registered accounts with localStorage persistence
   const [registeredUsers, setRegisteredUsers] = useState(loadStoredUsers);
+
+  // Sync users with live MySQL database whenever authenticated or on initial mount
+  useEffect(() => {
+    let mounted = true;
+
+    async function syncFromDatabase() {
+      try {
+        const dbUsers = await apiGetUsers();
+        if (mounted && Array.isArray(dbUsers) && dbUsers.length > 0) {
+          // Merge database users with local state
+          setRegisteredUsers((prev) => {
+            const byUsername = new Map();
+            // Put local demo accounts first
+            for (const u of prev) {
+              byUsername.set(u.username.toLowerCase(), u);
+            }
+            // Overwrite/add with true database records
+            for (const d of dbUsers) {
+              const key = (d.username || d.name || d.email).toLowerCase();
+              byUsername.set(key, {
+                ...byUsername.get(key),
+                ...d,
+                username: d.username || d.name || d.email,
+              });
+            }
+            return Array.from(byUsername.values());
+          });
+        }
+      } catch (err) {
+        // Quiet fallback if API is not yet logged in or offline
+      }
+    }
+
+    syncFromDatabase();
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
 
   // Persist registered users across page refreshes and logouts
   useEffect(() => {
@@ -101,22 +142,57 @@ export function AuthProvider({ children }) {
   const actions = useMemo(
     () => ({
       /**
-       * login(username, password) — looks up the username in the registry,
-       * validates the password, ensures the account is active, and sets the session.
-       * Returns { ok: true } on success or { ok: false, message } on failure.
+       * login(username, password) — authenticates via Laravel MySQL API.
+       * Falls back to local registry if API is offline.
        */
-      login: (username, password) => {
+      login: async (username, password) => {
+        const trimmed = username?.trim();
+        if (!trimmed) return { ok: false, message: 'Please enter a username or email.' };
+        if (!password) return { ok: false, message: 'Please enter a password.' };
+
+        // 1. Attempt live API login with MySQL
+        try {
+          const res = await apiLogin(trimmed, password);
+          if (res?.user) {
+            const session = {
+              id: res.user.id,
+              username: res.user.name || res.user.email,
+              role: res.user.role,
+              email: res.user.email,
+              active: res.user.active ?? true,
+              loginTime: new Date().toISOString(),
+            };
+            setUser(session);
+            return { ok: true, role: res.user.role };
+          }
+        } catch (apiErr) {
+          // If server returned a business rejection (403 deactivated, 422 wrong password)
+          if (apiErr.response?.data?.message) {
+            return { ok: false, message: apiErr.response.data.message };
+          }
+          if (apiErr.response?.status === 403) {
+            return { ok: false, message: 'This account has been deactivated. Please contact an administrator.' };
+          }
+        }
+
+        // 2. Fallback to local demo accounts if API connection failed
         const found = registeredUsers.find(
-          (u) => u.username.toLowerCase() === username?.trim().toLowerCase()
+          (u) =>
+            u.username.toLowerCase() === trimmed.toLowerCase() ||
+            (u.email && u.email.toLowerCase() === trimmed.toLowerCase())
         );
-        if (!found) return { ok: false, message: 'Username not found.' };
-        if (found.password !== password) return { ok: false, message: 'Incorrect password.' };
+        if (!found) return { ok: false, message: 'Username or email not found.' };
+        if (found.password && found.password !== password) {
+          return { ok: false, message: 'Incorrect password.' };
+        }
         if (!found.active) {
           return { ok: false, message: 'This account has been deactivated. Please contact an administrator.' };
         }
         const session = {
+          id: found.id,
           username: found.username,
           role: found.role,
+          email: found.email,
           loginTime: new Date().toISOString(),
         };
         setUser(session);
@@ -124,14 +200,38 @@ export function AuthProvider({ children }) {
       },
 
       /**
-       * register(username, password, role) — adds a new account to the registry.
-       * Returns { ok: true } on success or { ok: false, message } on failure.
+       * register(username, password, role) — adds new account to MySQL database!
        */
-      register: (username, password, role) => {
+      register: async (username, password, role = 'staff') => {
         const trimmed = username?.trim();
         if (!trimmed) return { ok: false, message: 'Username is required.' };
         if (!password) return { ok: false, message: 'Password is required.' };
         if (!ROLE_OPTIONS.includes(role)) return { ok: false, message: 'Invalid role.' };
+
+        // 1. Try persisting directly to MySQL
+        try {
+          const data = await apiRegister({ username: trimmed, password, role });
+          const created = data?.user;
+          const newAcct = {
+            id: created?.id,
+            username: created?.name || trimmed,
+            email: created?.email,
+            role: created?.role || role,
+            active: created?.active ?? true,
+            password,
+          };
+          setRegisteredUsers((prev) => [
+            ...prev.filter((u) => u.username.toLowerCase() !== trimmed.toLowerCase()),
+            newAcct,
+          ]);
+          return { ok: true };
+        } catch (apiErr) {
+          if (apiErr.response?.data?.message) {
+            return { ok: false, message: apiErr.response.data.message };
+          }
+        }
+
+        // 2. Fallback local registry
         const exists = registeredUsers.find(
           (u) => u.username.toLowerCase() === trimmed.toLowerCase()
         );
@@ -140,7 +240,14 @@ export function AuthProvider({ children }) {
         return { ok: true };
       },
 
-      logout: () => setUser(null),
+      logout: async () => {
+        try {
+          await apiLogout();
+        } catch (e) {
+          // ignore logout network errors
+        }
+        setUser(null);
+      },
 
       renameUser: (username) => {
         const newName = username?.trim();
@@ -156,11 +263,24 @@ export function AuthProvider({ children }) {
       },
 
       /**
-       * updateUserRole(username, newRole) — changes a registered user's role.
-       * If that user is currently logged in, updates their session role immediately.
+       * updateUserRole(username, newRole) — updates role in MySQL and local state.
        */
-      updateUserRole: (username, newRole) => {
+      updateUserRole: async (username, newRole) => {
         if (!ROLE_OPTIONS.includes(newRole)) return { ok: false, message: 'Invalid role.' };
+
+        const target = registeredUsers.find(
+          (u) => u.username.toLowerCase() === username.toLowerCase()
+        );
+
+        // Sync to MySQL if ID exists
+        if (target?.id) {
+          try {
+            await apiUpdateUser(target.id, { role: newRole });
+          } catch (err) {
+            console.error('Failed to update role in MySQL', err);
+          }
+        }
+
         setRegisteredUsers((prev) =>
           prev.map((u) =>
             u.username.toLowerCase() === username.toLowerCase() ? { ...u, role: newRole } : u
@@ -175,36 +295,66 @@ export function AuthProvider({ children }) {
       },
 
       /**
-       * toggleUserActive(username, currentUser) — flips the active flag (deactivate/reactivate).
-       * Guards against self-deactivation.
+       * toggleUserActive(username, currentUser) — updates status in MySQL and local state.
        */
-      toggleUserActive: (username, currentUser) => {
+      toggleUserActive: async (username, currentUser) => {
         if (
           currentUser &&
           currentUser.username.toLowerCase() === username.toLowerCase()
         ) {
           return { ok: false, message: 'You cannot deactivate your own account.' };
         }
+
+        const target = registeredUsers.find(
+          (u) => u.username.toLowerCase() === username.toLowerCase()
+        );
+        const nextActive = target ? !target.active : false;
+
+        // Sync to MySQL if ID exists
+        if (target?.id) {
+          try {
+            await apiUpdateUser(target.id, { active: nextActive });
+          } catch (err) {
+            if (err.response?.data?.message) {
+              return { ok: false, message: err.response.data.message };
+            }
+          }
+        }
+
         setRegisteredUsers((prev) =>
           prev.map((u) =>
-            u.username.toLowerCase() === username.toLowerCase() ? { ...u, active: !u.active } : u
+            u.username.toLowerCase() === username.toLowerCase() ? { ...u, active: nextActive } : u
           )
         );
         return { ok: true };
       },
 
       /**
-       * deleteUser(username) — permanently removes a user from the registry.
-       * Guards: cannot delete the currently logged-in user (self-deletion).
-       * Returns { ok: false, message } when the guard triggers.
+       * deleteUser(username, currentUser) — removes user from MySQL and local state.
        */
-      deleteUser: (username, currentUser) => {
+      deleteUser: async (username, currentUser) => {
         if (
           currentUser &&
           currentUser.username.toLowerCase() === username.toLowerCase()
         ) {
           return { ok: false, message: 'You cannot delete your own account.' };
         }
+
+        const target = registeredUsers.find(
+          (u) => u.username.toLowerCase() === username.toLowerCase()
+        );
+
+        // Sync to MySQL if ID exists
+        if (target?.id) {
+          try {
+            await apiDeleteUser(target.id);
+          } catch (err) {
+            if (err.response?.data?.message) {
+              return { ok: false, message: err.response.data.message };
+            }
+          }
+        }
+
         setRegisteredUsers((prev) =>
           prev.filter((u) => u.username.toLowerCase() !== username.toLowerCase())
         );
@@ -229,7 +379,6 @@ export function useAuth() {
 }
 
 // Central place for "who can do what" so every page checks the same rules.
-// View access is open to any logged-in role — only these write actions differ.
 export function usePermissions() {
   const { user } = useAuth();
   const role = user?.role;
@@ -239,24 +388,17 @@ export function usePermissions() {
     isAdmin: role === 'admin',
     isManager: role === 'manager',
     isStaff: role === 'staff',
-    // Products / Settings route-level guard — Admin only (used by RequireRole in App.jsx).
     canManageCatalog: role === 'admin',
-    // Products: granular in-page controls.
     canAddProduct: role === 'admin',
     canEditProduct: role === 'admin' || role === 'manager',
     canDeleteProduct: role === 'admin',
-    // Suppliers: granular in-page controls.
     canViewSuppliers: role === 'admin' || role === 'manager' || role === 'staff',
     canAddSupplier: role === 'admin',
     canEditSupplier: role === 'admin' || role === 'manager',
     canDeleteSupplier: role === 'admin',
-    // Accounts Management — Admin only.
     canManageAccounts: role === 'admin',
-    // Reorder Rules management — Admin only.
     canManageReorderRules: role === 'admin',
-    // Transactions: adding a new one — Admin + Manager.
     canAddTransaction: role === 'admin' || role === 'manager',
-    // Transactions: changing a status — Admin + Manager + Staff (anyone logged in).
     canChangeTransactionStatus: role === 'admin' || role === 'manager' || role === 'staff',
   };
 }

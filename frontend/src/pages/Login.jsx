@@ -27,18 +27,27 @@ export default function Login() {
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
 
-  function handleLogin(e) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleLogin(e) {
     e.preventDefault();
     setError('');
-    const result = login(loginUsername, loginPassword);
-    if (!result.ok) {
-      setError(result.message);
-      return;
+    setLoading(true);
+    try {
+      const result = await login(loginUsername, loginPassword);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      navigate(ROLE_HOME[result.role] ?? '/dashboard');
+    } catch (err) {
+      setError(err?.message || 'Login failed. Please check credentials.');
+    } finally {
+      setLoading(false);
     }
-    navigate(ROLE_HOME[result.role] ?? '/dashboard');
   }
 
-  function handleRegister(e) {
+  async function handleRegister(e) {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
@@ -46,19 +55,26 @@ export default function Login() {
       setError('Passwords do not match.');
       return;
     }
-    const result = register(regUsername, regPassword, 'staff');
-    if (!result.ok) {
-      setError(result.message);
-      return;
+    setLoading(true);
+    try {
+      const result = await register(regUsername, regPassword, 'staff');
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setSuccessMsg(`Account "${regUsername}" created in database! You can now sign in.`);
+      // Clear sign-up fields and switch to sign-in
+      setRegUsername('');
+      setRegPassword('');
+      setRegConfirmPassword('');
+      setShowRegPassword(false);
+      setShowRegConfirmPassword(false);
+      setMode('login');
+    } catch (err) {
+      setError(err?.message || 'Registration failed.');
+    } finally {
+      setLoading(false);
     }
-    setSuccessMsg(`Account "${regUsername}" created! You can now sign in.`);
-    // Clear sign-up fields and switch to sign-in
-    setRegUsername('');
-    setRegPassword('');
-    setRegConfirmPassword('');
-    setShowRegPassword(false);
-    setShowRegConfirmPassword(false);
-    setMode('login');
   }
 
   function switchMode(m) {

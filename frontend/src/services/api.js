@@ -112,18 +112,44 @@ export function normaliseInventory(inv) {
 
 /**
  * POST /auth/login
+/**
  * Stores the returned token in localStorage so the request interceptor picks
  * it up automatically on all subsequent calls.
  *
- * @param {string} email
+ * @param {string} identifier - Email or username
  * @param {string} password
  * @returns {Promise<{token: string, user: object}>}
  */
-export async function apiLogin(email, password) {
-  const { data } = await api.post('/auth/login', { email, password });
+export async function apiLogin(identifier, password) {
+  const { data } = await api.post('/auth/login', {
+    email: identifier,
+    username: identifier,
+    password,
+  });
   const token = data.data.token;
   localStorage.setItem('wb_token', token);
   return { token, user: data.data.user };
+}
+
+/**
+ * POST /auth/register
+ * Registers a new user into MySQL and stores the returned auth token.
+ *
+ * @param {{ username: string, password: string, email?: string, role?: string }} payload
+ * @returns {Promise<{token: string, user: object}>}
+ */
+export async function apiRegister(payload) {
+  const { data } = await api.post('/auth/register', {
+    username: payload.username,
+    password: payload.password,
+    email: payload.email,
+    role: payload.role || 'staff',
+  });
+  const token = data.data?.token;
+  if (token) {
+    localStorage.setItem('wb_token', token);
+  }
+  return data.data;
 }
 
 /**
@@ -147,6 +173,70 @@ export async function apiLogout() {
 export async function apiGetCurrentUser() {
   const { data } = await api.get('/auth/user');
   return data.data;
+}
+
+// ---------------------------------------------------------------------------
+// User Management (Account Management — MySQL)
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalises a raw user record from MySQL to frontend camelCase shape.
+ */
+export function normaliseUser(u) {
+  return {
+    id: u.id,
+    username: u.name || u.email?.split('@')[0],
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    active: Boolean(u.active ?? true),
+    createdAt: u.created_at,
+  };
+}
+
+/**
+ * GET /users
+ * Returns all user accounts directly from MySQL.
+ *
+ * @returns {Promise<object[]>}
+ */
+export async function apiGetUsers() {
+  const { data } = await api.get('/users');
+  const list = data.data ?? data;
+  return Array.isArray(list) ? list.map(normaliseUser) : [];
+}
+
+/**
+ * POST /users
+ * Admin creates a new user account in MySQL.
+ */
+export async function apiCreateUser(payload) {
+  const { data } = await api.post('/users', {
+    name: payload.username || payload.name,
+    email: payload.email,
+    password: payload.password,
+    role: payload.role,
+    active: payload.active ?? true,
+  });
+  return normaliseUser(data.data ?? data);
+}
+
+/**
+ * PUT /users/:id
+ * Admin updates role, status (active/inactive), or name in MySQL.
+ */
+export async function apiUpdateUser(id, payload) {
+  const { data } = await api.put(`/users/${id}`, payload);
+  return normaliseUser(data.data ?? data);
+}
+
+/**
+ * DELETE /users/:id
+ * Admin removes an account from MySQL.
+ */
+export async function apiDeleteUser(id) {
+  const { data } = await api.delete(`/users/${id}`);
+  return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -281,6 +371,28 @@ export async function apiAdjust(payload) {
 export async function apiGetBatches() {
   const { data } = await api.get('/batches');
   return data.data ?? data ?? [];
+}
+
+/**
+ * POST /batches
+ * Primary stock-in endpoint: records new lot and RECEIVE transaction in MySQL.
+ */
+export async function apiReceiveBatch(payload) {
+  const { data } = await api.post('/batches', {
+    product_id: payload.productId,
+    batch_number:
+      payload.batchNumber ||
+      payload.batchId ||
+      'LOT-' + Date.now().toString().slice(-6),
+    date_received: payload.dateReceived
+      ? payload.dateReceived.split('T')[0]
+      : new Date().toISOString().split('T')[0],
+    expiry_date: payload.expiryDate ? payload.expiryDate.split('T')[0] : null,
+    quantity: payload.qty || payload.quantity,
+    bin_location: payload.location || 'Aisle 1',
+    po_reference: payload.poReference || 'PO-' + Date.now().toString().slice(-5),
+  });
+  return data;
 }
 
 // ---------------------------------------------------------------------------

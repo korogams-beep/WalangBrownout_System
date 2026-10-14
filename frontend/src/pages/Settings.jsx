@@ -110,17 +110,18 @@ export default function Settings() {
     setRoleModal(account);
   }
 
-  function handleRoleSubmit(e) {
+  async function handleRoleSubmit(e) {
     e.preventDefault();
     if (roleModal) {
-      updateUserRole(roleModal.username, roleDraft);
+      const res = await updateUserRole(roleModal.username, roleDraft);
+      if (res && !res.ok) alert(res.message);
       setRoleModal(null);
     }
   }
 
-  function handleDeleteAccountConfirm() {
+  async function handleDeleteAccountConfirm() {
     if (deleteAccountTarget) {
-      const result = deleteUser(deleteAccountTarget.username, user);
+      const result = await deleteUser(deleteAccountTarget.username, user);
       if (result && !result.ok) {
         alert(result.message);
       }
@@ -309,8 +310,8 @@ export default function Settings() {
                       type="button"
                       className={styles.supplierActionBtn}
                       title={acct.active ? 'Deactivate account' : 'Reactivate account'}
-                      onClick={() => {
-                        const res = toggleUserActive(acct.username, user);
+                      onClick={async () => {
+                        const res = await toggleUserActive(acct.username, user);
                         if (res && !res.ok) alert(res.message);
                       }}
                     >

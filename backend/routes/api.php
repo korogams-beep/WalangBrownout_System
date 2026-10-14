@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\v1\AuthController;
+use App\Http\Controllers\Api\v1\UserController;
 use App\Http\Controllers\Api\v1\ProductController;
 use App\Http\Controllers\Api\v1\InventoryController;
 use App\Http\Controllers\Api\v1\BatchController;
@@ -36,8 +37,10 @@ Route::prefix('v1')->group(function () {
     // PUBLIC — Authentication (no token required)
     // -------------------------------------------------------------------------
     Route::prefix('auth')->group(function () {
-        // POST /api/v1/auth/login  → returns Bearer token
+        // POST /api/v1/auth/login     → returns Bearer token
         Route::post('/login', [AuthController::class, 'login']);
+        // POST /api/v1/auth/register  → registers new user in MySQL
+        Route::post('/register', [AuthController::class, 'register']);
     });
 
     // -------------------------------------------------------------------------
@@ -52,6 +55,9 @@ Route::prefix('v1')->group(function () {
             // GET  /api/v1/auth/user    → returns authenticated user profile
             Route::get('/user',   [AuthController::class, 'user']);
         });
+
+        // ── Users (Account Management) ────────────────────────────────────────
+        Route::apiResource('users', UserController::class);
 
         // ── Products ──────────────────────────────────────────────────────────
         // GET    /api/v1/products           → list all (filterable by class/search)
