@@ -194,11 +194,12 @@ npm run dev
    ```
 2. Log in using any of the seeded credentials:
 
-| Role | Email / Username | Password | Access Level |
-| :--- | :--- | :--- | :--- |
-| **System Administrator** | `admin@walangbrownout.com` | `Admin@WB2026!` | Full CRUD, Batches, Adjustments, Audit Logs |
-| **Inventory Manager** | `manager@walangbrownout.com` | `Manager@WB2026!` | Transactions, Order Commit, ATP Monitoring |
-| **Warehouse Staff** | `staff@walangbrownout.com` | `Staff@WB2026!` | FIFO Barcode Pick, Lot Inspection, Status Updates |
+| Role | Username | Email | Password | Access Level |
+| :--- | :--- | :--- | :--- | :--- |
+| **System Administrator** | `Ais` | `ais@walangbrownout.com` | `WB@Pnc2026!` | Full CRUD, Batches, Adjustments, Audit Logs, Accounts |
+| **Inventory Manager** | `Brent` | `brent@walangbrownout.com` | `WB@Pnc2026!` | Transactions, Order Commit, ATP Monitoring, Product Edit |
+| **Warehouse Staff** | `Emerson` | `emerson@walangbrownout.com` | `WB@Pnc2026!` | FIFO Barcode Pick, Lot Receiving, Status Updates |
+| **Warehouse Staff 2** | `Ezra` | `ezra@walangbrownout.com` | `WB@Pnc2026!` | FIFO Barcode Pick, Lot Receiving, Status Updates |
 
 ---
 

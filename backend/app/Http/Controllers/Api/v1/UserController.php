@@ -148,10 +148,10 @@ class UserController extends Controller
         }
 
         // Prevent deletion of primary system administrator
-        if ($user->email === 'admin@walangbrownout.com') {
+        if ($user->email === 'ais@walangbrownout.com' || strtolower($user->name) === 'ais') {
             return response()->json([
                 'success' => false,
-                'message' => 'The default system administrator account cannot be deleted.',
+                'message' => 'The default system administrator account ("Ais") cannot be deleted.',
             ], 422);
         }
 

@@ -30,17 +30,15 @@ export const ROLE_LABEL = {
 
 export const ROLE_OPTIONS = ['admin', 'manager', 'staff'];
 
-// Default initial accounts for offline/initial state
+// 4 Official System Demo Accounts
 const INITIAL_USERS = [
-  { username: 'admin',    password: 'admin123',    role: 'admin',   active: true },
-  { username: 'manager1', password: 'manager123',  role: 'manager', active: true },
-  { username: 'staff1',   password: 'staff123',    role: 'staff',   active: true },
-  { username: 'admin@walangbrownout.com',   password: 'Admin@WB2026!',   role: 'admin',   active: true },
-  { username: 'manager@walangbrownout.com', password: 'Manager@WB2026!', role: 'manager', active: true },
-  { username: 'staff@walangbrownout.com',   password: 'Staff@WB2026!',   role: 'staff',   active: true },
+  { username: 'Ais',     password: 'WB@Pnc2026!', role: 'admin',   active: true, email: 'ais@walangbrownout.com' },
+  { username: 'Brent',   password: 'WB@Pnc2026!', role: 'manager', active: true, email: 'brent@walangbrownout.com' },
+  { username: 'Emerson', password: 'WB@Pnc2026!', role: 'staff',   active: true, email: 'emerson@walangbrownout.com' },
+  { username: 'Ezra',    password: 'WB@Pnc2026!', role: 'staff',   active: true, email: 'ezra@walangbrownout.com' },
 ];
 
-const USERS_STORAGE_KEY = 'wb_registered_users';
+const USERS_STORAGE_KEY = 'wb_users_v3';
 const SESSION_STORAGE_KEY = 'wb_auth_user';
 
 function loadStoredUsers() {
@@ -49,14 +47,14 @@ function loadStoredUsers() {
     if (!raw) return INITIAL_USERS;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      const existing = new Set(parsed.map((u) => u.username.toLowerCase()));
-      const merged = [...parsed];
-      for (const init of INITIAL_USERS) {
-        if (!existing.has(init.username.toLowerCase())) {
-          merged.push(init);
-        }
-      }
-      return merged;
+      // Remove any old legacy accounts if present
+      const cleaned = parsed.filter(
+        (u) =>
+          !['admin', 'manager1', 'staff1', 'admin@walangbrownout.com', 'manager@walangbrownout.com', 'staff@walangbrownout.com'].includes(
+            (u.username || '').toLowerCase()
+          )
+      );
+      return cleaned.length > 0 ? cleaned : INITIAL_USERS;
     }
   } catch (err) {
     console.error('Failed to load users from localStorage', err);
@@ -87,27 +85,11 @@ export function AuthProvider({ children }) {
       try {
         const dbUsers = await apiGetUsers();
         if (mounted && Array.isArray(dbUsers) && dbUsers.length > 0) {
-          // Merge database users with local state
-          setRegisteredUsers((prev) => {
-            const byUsername = new Map();
-            // Put local demo accounts first
-            for (const u of prev) {
-              byUsername.set(u.username.toLowerCase(), u);
-            }
-            // Overwrite/add with true database records
-            for (const d of dbUsers) {
-              const key = (d.username || d.name || d.email).toLowerCase();
-              byUsername.set(key, {
-                ...byUsername.get(key),
-                ...d,
-                username: d.username || d.name || d.email,
-              });
-            }
-            return Array.from(byUsername.values());
-          });
+          // Live database accounts take full precedence
+          setRegisteredUsers(dbUsers);
         }
       } catch (err) {
-        // Quiet fallback if API is not yet logged in or offline
+        // Fallback to local demo accounts if API is not reachable
       }
     }
 

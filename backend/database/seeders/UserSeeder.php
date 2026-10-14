@@ -10,59 +10,45 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Admin account — full access (manage products, run adjustments, delete batches)
-        User::updateOrCreate(
-            ['email' => 'admin@walangbrownout.com'],
+        // 4 Official System Demo Accounts
+        $accounts = [
             [
-                'name'     => 'System Administrator',
-                'email'    => 'admin@walangbrownout.com',
-                'password' => Hash::make('Admin@WB2026!'),
+                'name'     => 'Ais',
+                'email'    => 'ais@walangbrownout.com',
+                'password' => Hash::make('WB@Pnc2026!'),
                 'role'     => 'admin',
-            ]
-        );
-
-        // Manager account — can view all modules, add transactions, and change status
-        User::updateOrCreate(
-            ['email' => 'manager@walangbrownout.com'],
+                'active'   => true,
+            ],
             [
-                'name'     => 'Inventory Manager',
-                'email'    => 'manager@walangbrownout.com',
-                'password' => Hash::make('Manager@WB2026!'),
+                'name'     => 'Brent',
+                'email'    => 'brent@walangbrownout.com',
+                'password' => Hash::make('WB@Pnc2026!'),
                 'role'     => 'manager',
-            ]
-        );
-
-        // Staff account — daily operations (receive stock, commit orders, pick batches)
-        User::updateOrCreate(
-            ['email' => 'staff@walangbrownout.com'],
+                'active'   => true,
+            ],
             [
-                'name'     => 'Warehouse Staff',
-                'email'    => 'staff@walangbrownout.com',
-                'password' => Hash::make('Staff@WB2026!'),
+                'name'     => 'Emerson',
+                'email'    => 'emerson@walangbrownout.com',
+                'password' => Hash::make('WB@Pnc2026!'),
                 'role'     => 'staff',
-            ]
-        );
-
-        // Individual team member accounts (for CCS112 demo / lab testing)
-        $members = [
-            ['name' => 'Facistol, Eazra Eliel R.',  'email' => 'facistol@walangbrownout.com',  'role' => 'admin'],
-            ['name' => 'Gamalo, Brent Harold R.',    'email' => 'gamalo@walangbrownout.com',    'role' => 'admin'],
-            ['name' => 'Guevarra, Jan Emerson C.',   'email' => 'guevarra@walangbrownout.com',  'role' => 'staff'],
-            ['name' => 'Intia, Ais B.',              'email' => 'intia@walangbrownout.com',     'role' => 'staff'],
+                'active'   => true,
+            ],
+            [
+                'name'     => 'Ezra',
+                'email'    => 'ezra@walangbrownout.com',
+                'password' => Hash::make('WB@Pnc2026!'),
+                'role'     => 'staff',
+                'active'   => true,
+            ],
         ];
 
-        foreach ($members as $member) {
+        foreach ($accounts as $acc) {
             User::updateOrCreate(
-                ['email' => $member['email']],
-                [
-                    'name'     => $member['name'],
-                    'email'    => $member['email'],
-                    'password' => Hash::make('WB@Pnc2026!'),
-                    'role'     => $member['role'],
-                ]
+                ['email' => $acc['email']],
+                $acc
             );
         }
 
-        $this->command->info('  Users seeded: 3 system accounts (admin, manager, staff) + 4 team member accounts.');
+        $this->command->info('  Users seeded: 4 demo accounts (Ais - Admin, Brent - Manager, Emerson - Staff, Ezra - Staff 2).');
     }
 }

@@ -62,7 +62,7 @@ export default function Login() {
         setError(result.message);
         return;
       }
-      setSuccessMsg(`Account "${regUsername}" created in database! You can now sign in.`);
+      setSuccessMsg(`Account "${regUsername}" created successfully! You can now sign in.`);
       // Clear sign-up fields and switch to sign-in
       setRegUsername('');
       setRegPassword('');
