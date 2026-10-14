@@ -26,6 +26,10 @@ return Application::configure(basePath: dirname(__DIR__))
         | keeping token-based auth available for the decoupled React client.
         */
         $middleware->statefulApi();
+        $middleware->redirectTo(
+            guests: fn (Request $request) => $request->is('api/*') ? null : '/',
+            users: '/'
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
 

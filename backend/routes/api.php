@@ -45,6 +45,12 @@ Route::prefix('v1')->group(function () {
     });
 
     // -------------------------------------------------------------------------
+    // PUBLIC — Products Catalog (read-only for quick links and public viewing)
+    // -------------------------------------------------------------------------
+    Route::get('/products',             [ProductController::class, 'index']);
+    Route::get('/products/{productId}', [ProductController::class, 'show']);
+
+    // -------------------------------------------------------------------------
     // PROTECTED — All routes below require a valid Sanctum Bearer token
     // -------------------------------------------------------------------------
     Route::middleware('auth:sanctum')->group(function () {
@@ -60,14 +66,13 @@ Route::prefix('v1')->group(function () {
         // ── Users (Account Management) ────────────────────────────────────────
         Route::apiResource('users', UserController::class);
 
-        // ── Products ──────────────────────────────────────────────────────────
-        // GET    /api/v1/products           → list all (filterable by class/search)
+        // ── Products Management (Admin/Manager mutations) ─────────────────────
         // POST   /api/v1/products           → create new product + inventory row
-        // GET    /api/v1/products/{id}      → single product with inventory + batches
         // PUT    /api/v1/products/{id}      → update catalog fields
         // DELETE /api/v1/products/{id}      → delete (cascade to inventory/batches)
-        Route::apiResource('products', ProductController::class)
-             ->parameters(['products' => 'productId']);
+        Route::post('/products',               [ProductController::class, 'store']);
+        Route::put('/products/{productId}',    [ProductController::class, 'update']);
+        Route::delete('/products/{productId}', [ProductController::class, 'destroy']);
 
         // ── Inventory ─────────────────────────────────────────────────────────
         // GET /api/v1/inventory             → all products with live ATP

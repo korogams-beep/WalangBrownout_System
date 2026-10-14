@@ -25,12 +25,20 @@ export default function ProductModal({ open, onClose, editProduct = null }) {
   const { products, addProduct, editProduct: saveEdit } = useInventory();
   const isEditMode = editProduct !== null;
 
-  const nextProductId = useMemo(
-    () => `PID-${String(products.length + 1).padStart(3, '0')}`,
-    [products.length]
-  );
+  const nextProductId = useMemo(() => {
+    let maxNum = products.length;
+    products.forEach((p) => {
+      const match = p.id?.match(/PID-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    return `PID-${String(maxNum + 1).padStart(3, '0')}`;
+  }, [products]);
 
   const [form, setForm] = useState(initialForm);
+  const [productIdInput, setProductIdInput] = useState('');
   const [justSaved, setJustSaved] = useState(null);
 
   // Pre-fill form when opening in edit mode
@@ -44,8 +52,10 @@ export default function ProductModal({ open, onClose, editProduct = null }) {
           startingQty: editProduct.qtyOnHand ?? 0,
           warehouse: editProduct.warehouse || 'Main Warehouse',
         });
+        setProductIdInput(editProduct.id || '');
       } else {
         setForm(initialForm);
+        setProductIdInput('');
       }
       setJustSaved(null);
     }
@@ -82,8 +92,9 @@ export default function ProductModal({ open, onClose, editProduct = null }) {
       saveEdit(updated);
       setJustSaved(updated);
     } else {
+      const finalId = (productIdInput.trim() || nextProductId).toUpperCase();
       const product = {
-        id: nextProductId,
+        id: finalId,
         name: form.name,
         category: form.category,
         unitPrice: Number(form.unitPrice) || 0,
@@ -184,8 +195,13 @@ export default function ProductModal({ open, onClose, editProduct = null }) {
                 </>
               }
             >
-              <FormField label="Product ID">
-                <input value={isEditMode ? editProduct.id : nextProductId} disabled />
+              <FormField label="Product ID (Auto or Custom)">
+                <input
+                  value={isEditMode ? editProduct.id : (productIdInput || nextProductId)}
+                  onChange={(e) => setProductIdInput(e.target.value.toUpperCase())}
+                  placeholder={nextProductId}
+                  disabled={isEditMode}
+                />
               </FormField>
               <FormField label="Product Name">
                 <input
