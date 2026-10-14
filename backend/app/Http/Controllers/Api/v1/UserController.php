@@ -48,11 +48,11 @@ class UserController extends Controller
             ? trim($validated['email'])
             : strtolower(preg_replace('/[^a-zA-Z0-9._-]/', '', $username)) . '@walangbrownout.com';
 
-        // Check if email already exists
-        if (User::where('email', $email)->exists()) {
+        // Check if username or email already exists
+        if (User::where('name', $username)->orWhere('email', $email)->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'An account with this email or username already exists.',
+                'message' => 'An account with this username or email already exists.',
             ], 422);
         }
 

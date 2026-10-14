@@ -4,6 +4,7 @@ import {
   apiRegister,
   apiLogout,
   apiGetUsers,
+  apiCreateUser,
   apiUpdateUser,
   apiDeleteUser,
 } from '../services/api.js';
@@ -222,6 +223,50 @@ export function AuthProvider({ children }) {
         return { ok: true };
       },
 
+      /**
+       * addUserAccount({ username, email, password, role }) — Admin creates account in MySQL.
+       */
+      addUserAccount: async ({ username, email, password, role = 'staff' }) => {
+        const trimmed = username?.trim();
+        if (!trimmed) return { ok: false, message: 'Username is required.' };
+        if (!password) return { ok: false, message: 'Password is required.' };
+        if (!ROLE_OPTIONS.includes(role)) return { ok: false, message: 'Invalid role.' };
+
+        try {
+          const created = await apiCreateUser({
+            username: trimmed,
+            email: email?.trim() || undefined,
+            password,
+            role,
+            active: true,
+          });
+          const newAcct = {
+            id: created.id,
+            username: created.username || trimmed,
+            name: created.name || trimmed,
+            email: created.email,
+            role: created.role || role,
+            active: created.active ?? true,
+          };
+          setRegisteredUsers((prev) => [
+            ...prev.filter((u) => u.username.toLowerCase() !== trimmed.toLowerCase()),
+            newAcct,
+          ]);
+          return { ok: true, user: newAcct };
+        } catch (err) {
+          if (err.response?.data?.message) {
+            return { ok: false, message: err.response.data.message };
+          }
+          const exists = registeredUsers.find(
+            (u) => u.username.toLowerCase() === trimmed.toLowerCase()
+          );
+          if (exists) return { ok: false, message: 'Username already taken.' };
+          const fallbackUser = { username: trimmed, password, role, active: true };
+          setRegisteredUsers((prev) => [...prev, fallbackUser]);
+          return { ok: true, user: fallbackUser };
+        }
+      },
+
       logout: async () => {
         try {
           await apiLogout();
@@ -379,6 +424,7 @@ export function usePermissions() {
     canEditSupplier: role === 'admin' || role === 'manager',
     canDeleteSupplier: role === 'admin',
     canManageAccounts: role === 'admin',
+    canAddAccount: role === 'admin',
     canManageReorderRules: role === 'admin',
     canAddTransaction: role === 'admin' || role === 'manager',
     canChangeTransactionStatus: role === 'admin' || role === 'manager' || role === 'staff',

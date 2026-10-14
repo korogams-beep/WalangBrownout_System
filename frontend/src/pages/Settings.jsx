@@ -13,13 +13,22 @@ import styles from './Settings.module.css';
 const emptySupplier = { name: '', contactPerson: '', phone: '', email: '', address: '' };
 
 export default function Settings() {
-  const { user, renameUser, registeredUsers, updateUserRole, toggleUserActive, deleteUser } = useAuth();
+  const {
+    user,
+    renameUser,
+    registeredUsers,
+    updateUserRole,
+    toggleUserActive,
+    deleteUser,
+    addUserAccount,
+  } = useAuth();
   const {
     canViewSuppliers,
     canAddSupplier,
     canEditSupplier,
     canDeleteSupplier,
     canManageAccounts,
+    canAddAccount,
     canManageReorderRules,
   } = usePermissions();
   const {
@@ -62,10 +71,44 @@ export default function Settings() {
   const [deleteSupplierTarget, setDeleteSupplierTarget] = useState(null);
 
   // ── Account management ─────────────────────────────────────────────────
+  const initialUserForm = { username: '', email: '', role: 'staff', password: '' };
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [userForm, setUserForm] = useState(initialUserForm);
+  const [userModalError, setUserModalError] = useState('');
+  const [userModalLoading, setUserModalLoading] = useState(false);
+
   // roleModal: null = closed | user-object (open for role change)
   const [roleModal, setRoleModal] = useState(null);
   const [roleDraft, setRoleDraft] = useState('');
   const [deleteAccountTarget, setDeleteAccountTarget] = useState(null);
+
+  function openAddUserModal() {
+    setUserForm(initialUserForm);
+    setUserModalError('');
+    setUserModalOpen(true);
+  }
+
+  function updateUserForm(field, value) {
+    setUserForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleAddUserSubmit(e) {
+    e.preventDefault();
+    setUserModalError('');
+    setUserModalLoading(true);
+    try {
+      const res = await addUserAccount(userForm);
+      if (!res.ok) {
+        setUserModalError(res.message);
+        return;
+      }
+      setUserModalOpen(false);
+    } catch (err) {
+      setUserModalError(err?.message || 'Failed to create user account.');
+    } finally {
+      setUserModalLoading(false);
+    }
+  }
   function openAddSupplier() {
     setSupplierForm(emptySupplier);
     setSupplierError('');
@@ -269,6 +312,13 @@ export default function Settings() {
         <Card
           title="Accounts Management"
           className={styles.accountsCard}
+          action={
+            canAddAccount ? (
+              <Button variant="accent" icon={PlusIcon} onClick={openAddUserModal}>
+                Add User Account
+              </Button>
+            ) : null
+          }
         >
           <p className={styles.helperText}>
             Manage all registered accounts. Only Admins can view and edit this section.
@@ -549,6 +599,82 @@ export default function Settings() {
               <Button variant="secondary" onClick={() => setDeleteAccountTarget(null)}>Cancel</Button>
               <Button variant="danger" onClick={handleDeleteAccountConfirm}>Delete</Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add User Account Modal ────────────────────────────────────── */}
+      {userModalOpen && (
+        <div className={styles.modalOverlay} onClick={() => setUserModalOpen(false)}>
+          <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Add User Account</h3>
+            <form onSubmit={handleAddUserSubmit}>
+              <div className={styles.modalBody}>
+                {userModalError && (
+                  <p className={styles.modalError}>{userModalError}</p>
+                )}
+                <div className={styles.modalGrid}>
+                  <label className={`${styles.modalLabel} ${styles.modalLabelFull}`}>
+                    Username <span className={styles.required}>*</span>
+                    <input
+                      className={styles.modalInput}
+                      value={userForm.username}
+                      onChange={(e) => updateUserForm('username', e.target.value)}
+                      placeholder="e.g. Juan"
+                      required
+                      autoFocus
+                    />
+                  </label>
+                  <label className={`${styles.modalLabel} ${styles.modalLabelFull}`}>
+                    Email Address (optional)
+                    <input
+                      className={styles.modalInput}
+                      type="email"
+                      value={userForm.email}
+                      onChange={(e) => updateUserForm('email', e.target.value)}
+                      placeholder="e.g. juan@walangbrownout.com"
+                    />
+                  </label>
+                  <label className={`${styles.modalLabel} ${styles.modalLabelFull}`}>
+                    Assigned Role <span className={styles.required}>*</span>
+                    <select
+                      className={styles.modalInput}
+                      value={userForm.role}
+                      onChange={(e) => updateUserForm('role', e.target.value)}
+                    >
+                      {ROLE_OPTIONS.map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABEL[r]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={`${styles.modalLabel} ${styles.modalLabelFull}`}>
+                    Password <span className={styles.required}>*</span>
+                    <input
+                      className={styles.modalInput}
+                      type="password"
+                      value={userForm.password}
+                      onChange={(e) => updateUserForm('password', e.target.value)}
+                      placeholder="Minimum 6 characters"
+                      required
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className={styles.modalFooter}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setUserModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" variant="accent" disabled={userModalLoading}>
+                  {userModalLoading ? 'Creating...' : 'Create Account'}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}
