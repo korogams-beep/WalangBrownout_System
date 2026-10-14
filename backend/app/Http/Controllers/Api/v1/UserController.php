@@ -37,15 +37,16 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name'     => 'required|string|max:100',
-            'email'    => 'nullable|email|max:150|unique:users,email',
+            'email'    => 'nullable|email|max:150',
             'password' => 'required|string|min:6',
             'role'     => 'required|in:admin,manager,staff',
             'active'   => 'nullable|boolean',
         ]);
 
         $username = trim($validated['name']);
-        $email = !empty($validated['email'])
-            ? trim($validated['email'])
+        $rawEmail = isset($validated['email']) ? trim($validated['email']) : '';
+        $email = !empty($rawEmail)
+            ? $rawEmail
             : strtolower(preg_replace('/[^a-zA-Z0-9._-]/', '', $username)) . '@walangbrownout.com';
 
         // Check if username or email already exists
@@ -109,7 +110,20 @@ class UserController extends Controller
         }
 
         if (isset($validated['name'])) {
-            $user->name = trim($validated['name']);
+            $newName = trim($validated['name']);
+            if (empty($newName)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Username cannot be blank.',
+                ], 422);
+            }
+            if (User::where('name', $newName)->where('id', '!=', $user->id)->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Username "' . $newName . '" is already taken.',
+                ], 422);
+            }
+            $user->name = $newName;
         }
         if (isset($validated['role'])) {
             $user->role = $validated['role'];

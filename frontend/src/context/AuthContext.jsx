@@ -7,6 +7,7 @@ import {
   apiCreateUser,
   apiUpdateUser,
   apiDeleteUser,
+  getApiErrorMessage,
 } from '../services/api.js';
 
 // Session + role state with live MySQL database synchronization.
@@ -126,7 +127,7 @@ export function AuthProvider({ children }) {
     () => ({
       /**
        * login(username, password) — authenticates via Laravel MySQL API.
-       * Falls back to local registry if API is offline.
+       * Falls back to local registry ONLY if server is completely unreachable (offline).
        */
       login: async (username, password) => {
         const trimmed = username?.trim();
@@ -140,6 +141,7 @@ export function AuthProvider({ children }) {
             const session = {
               id: res.user.id,
               username: res.user.name || res.user.email,
+              name: res.user.name || res.user.email,
               role: res.user.role,
               email: res.user.email,
               active: res.user.active ?? true,
@@ -149,31 +151,32 @@ export function AuthProvider({ children }) {
             return { ok: true, role: res.user.role };
           }
         } catch (apiErr) {
-          // If server returned a business rejection (403 deactivated, 422 wrong password)
-          if (apiErr.response?.data?.message) {
-            return { ok: false, message: apiErr.response.data.message };
+          // If the server responded (422 wrong credentials, 403 deactivated, 401, etc.),
+          // this is an authoritative response from MySQL — NEVER bypass it or fall back!
+          if (apiErr.response) {
+            const message = getApiErrorMessage(apiErr, 'Invalid credentials.');
+            return { ok: false, message };
           }
-          if (apiErr.response?.status === 403) {
-            return { ok: false, message: 'This account has been deactivated. Please contact an administrator.' };
-          }
+          console.warn('Backend API unreachable, checking offline fallback:', apiErr.message);
         }
 
-        // 2. Fallback to local demo accounts if API connection failed
-        const found = registeredUsers.find(
+        // 2. Fallback to local demo accounts ONLY if API server is completely offline (network down)
+        const found = INITIAL_USERS.find(
           (u) =>
             u.username.toLowerCase() === trimmed.toLowerCase() ||
             (u.email && u.email.toLowerCase() === trimmed.toLowerCase())
         );
-        if (!found) return { ok: false, message: 'Username or email not found.' };
-        if (found.password && found.password !== password) {
-          return { ok: false, message: 'Incorrect password.' };
+        if (!found) return { ok: false, message: 'Cannot connect to server, and account not found locally.' };
+        if (!found.password || found.password !== password) {
+          return { ok: false, message: 'The provided credentials are incorrect.' };
         }
         if (!found.active) {
           return { ok: false, message: 'This account has been deactivated. Please contact an administrator.' };
         }
         const session = {
-          id: found.id,
+          id: found.username,
           username: found.username,
+          name: found.username,
           role: found.role,
           email: found.email,
           loginTime: new Date().toISOString(),
@@ -189,19 +192,19 @@ export function AuthProvider({ children }) {
         const trimmed = username?.trim();
         if (!trimmed) return { ok: false, message: 'Username is required.' };
         if (!password) return { ok: false, message: 'Password is required.' };
+        if (password.length < 6) return { ok: false, message: 'Password must be at least 6 characters.' };
         if (!ROLE_OPTIONS.includes(role)) return { ok: false, message: 'Invalid role.' };
 
-        // 1. Try persisting directly to MySQL
         try {
           const data = await apiRegister({ username: trimmed, password, role });
           const created = data?.user;
           const newAcct = {
             id: created?.id,
             username: created?.name || trimmed,
+            name: created?.name || trimmed,
             email: created?.email,
             role: created?.role || role,
             active: created?.active ?? true,
-            password,
           };
           setRegisteredUsers((prev) => [
             ...prev.filter((u) => u.username.toLowerCase() !== trimmed.toLowerCase()),
@@ -209,18 +212,9 @@ export function AuthProvider({ children }) {
           ]);
           return { ok: true };
         } catch (apiErr) {
-          if (apiErr.response?.data?.message) {
-            return { ok: false, message: apiErr.response.data.message };
-          }
+          const message = getApiErrorMessage(apiErr, 'Registration failed.');
+          return { ok: false, message };
         }
-
-        // 2. Fallback local registry
-        const exists = registeredUsers.find(
-          (u) => u.username.toLowerCase() === trimmed.toLowerCase()
-        );
-        if (exists) return { ok: false, message: 'Username already taken.' };
-        setRegisteredUsers((prev) => [...prev, { username: trimmed, password, role, active: true }]);
-        return { ok: true };
       },
 
       /**
@@ -230,6 +224,7 @@ export function AuthProvider({ children }) {
         const trimmed = username?.trim();
         if (!trimmed) return { ok: false, message: 'Username is required.' };
         if (!password) return { ok: false, message: 'Password is required.' };
+        if (password.length < 6) return { ok: false, message: 'Password must be at least 6 characters.' };
         if (!ROLE_OPTIONS.includes(role)) return { ok: false, message: 'Invalid role.' };
 
         try {
@@ -242,8 +237,8 @@ export function AuthProvider({ children }) {
           });
           const newAcct = {
             id: created.id,
-            username: created.username || trimmed,
-            name: created.name || trimmed,
+            username: created.username || created.name || trimmed,
+            name: created.name || created.username || trimmed,
             email: created.email,
             role: created.role || role,
             active: created.active ?? true,
@@ -254,16 +249,8 @@ export function AuthProvider({ children }) {
           ]);
           return { ok: true, user: newAcct };
         } catch (err) {
-          if (err.response?.data?.message) {
-            return { ok: false, message: err.response.data.message };
-          }
-          const exists = registeredUsers.find(
-            (u) => u.username.toLowerCase() === trimmed.toLowerCase()
-          );
-          if (exists) return { ok: false, message: 'Username already taken.' };
-          const fallbackUser = { username: trimmed, password, role, active: true };
-          setRegisteredUsers((prev) => [...prev, fallbackUser]);
-          return { ok: true, user: fallbackUser };
+          const message = getApiErrorMessage(err, 'Failed to create user in database.');
+          return { ok: false, message };
         }
       },
 
@@ -276,17 +263,36 @@ export function AuthProvider({ children }) {
         setUser(null);
       },
 
-      renameUser: (username) => {
+      /**
+       * renameUser(newName) — updates current user's name in MySQL and local state.
+       */
+      renameUser: async (username) => {
         const newName = username?.trim();
-        if (!newName) return;
-        setUser((prev) => (prev ? { ...prev, username: newName } : prev));
+        if (!newName) return { ok: false, message: 'Username cannot be blank.' };
+        if (user && user.username.toLowerCase() === newName.toLowerCase()) {
+          return { ok: true };
+        }
+
+        // Sync to MySQL if user has an ID
+        if (user?.id) {
+          try {
+            await apiUpdateUser(user.id, { name: newName });
+          } catch (err) {
+            const message = getApiErrorMessage(err, 'Failed to update username in database.');
+            return { ok: false, message };
+          }
+        }
+
+        const oldName = user?.username;
+        setUser((curr) => (curr ? { ...curr, username: newName, name: newName } : curr));
         setRegisteredUsers((prev) =>
           prev.map((u) =>
-            user && u.username.toLowerCase() === user.username.toLowerCase()
-              ? { ...u, username: newName }
+            oldName && u.username.toLowerCase() === oldName.toLowerCase()
+              ? { ...u, username: newName, name: newName }
               : u
           )
         );
+        return { ok: true };
       },
 
       /**
@@ -304,7 +310,8 @@ export function AuthProvider({ children }) {
           try {
             await apiUpdateUser(target.id, { role: newRole });
           } catch (err) {
-            console.error('Failed to update role in MySQL', err);
+            const message = getApiErrorMessage(err, 'Failed to update role in database.');
+            return { ok: false, message };
           }
         }
 
@@ -342,9 +349,8 @@ export function AuthProvider({ children }) {
           try {
             await apiUpdateUser(target.id, { active: nextActive });
           } catch (err) {
-            if (err.response?.data?.message) {
-              return { ok: false, message: err.response.data.message };
-            }
+            const message = getApiErrorMessage(err, 'Failed to update account status in database.');
+            return { ok: false, message };
           }
         }
 
@@ -376,9 +382,8 @@ export function AuthProvider({ children }) {
           try {
             await apiDeleteUser(target.id);
           } catch (err) {
-            if (err.response?.data?.message) {
-              return { ok: false, message: err.response.data.message };
-            }
+            const message = getApiErrorMessage(err, 'Failed to delete account from database.');
+            return { ok: false, message };
           }
         }
 

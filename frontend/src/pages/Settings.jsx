@@ -4,7 +4,7 @@ import Card from '../components/ui/Card.jsx';
 import DataTable from '../components/ui/DataTable.jsx';
 import Button from '../components/ui/Button.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
-import { UserIcon, PlusIcon, EditIcon, TrashIcon } from '../components/ui/Icons.jsx';
+import { UserIcon, PlusIcon, EditIcon, TrashIcon, EyeIcon, EyeOffIcon } from '../components/ui/Icons.jsx';
 import { useAuth, usePermissions, ROLE_LABEL, ROLE_OPTIONS } from '../context/AuthContext.jsx';
 import { useInventory } from '../context/InventoryContext.jsx';
 import { generateReorderRule } from '../utils/inventoryLogic.js';
@@ -76,6 +76,7 @@ export default function Settings() {
   const [userForm, setUserForm] = useState(initialUserForm);
   const [userModalError, setUserModalError] = useState('');
   const [userModalLoading, setUserModalLoading] = useState(false);
+  const [showUserPassword, setShowUserPassword] = useState(false);
 
   // roleModal: null = closed | user-object (open for role change)
   const [roleModal, setRoleModal] = useState(null);
@@ -85,6 +86,7 @@ export default function Settings() {
   function openAddUserModal() {
     setUserForm(initialUserForm);
     setUserModalError('');
+    setShowUserPassword(false);
     setUserModalOpen(true);
   }
 
@@ -173,10 +175,32 @@ export default function Settings() {
   }
 
   // ── Handlers ───────────────────────────────────────────────────────────
-  function handleSaveName(e) {
+  async function handleSaveName(e) {
     e.preventDefault();
-    renameUser(nameDraft);
-    setEditingName(false);
+    const trimmed = nameDraft.trim();
+    if (!trimmed) {
+      alert('Username cannot be empty.');
+      return;
+    }
+    if (user && trimmed === user.username) {
+      setEditingName(false);
+      return;
+    }
+    const confirmed = window.confirm(
+      `Are you sure you want to change your username from "${user?.username}" to "${trimmed}"?`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await renameUser(trimmed);
+      if (res && !res.ok) {
+        alert(res.message || 'Failed to update username.');
+        return;
+      }
+      setEditingName(false);
+    } catch (err) {
+      alert(err?.message || 'Failed to update username.');
+    }
   }
 
   function handleSaveRule() {
@@ -651,14 +675,30 @@ export default function Settings() {
                   </label>
                   <label className={`${styles.modalLabel} ${styles.modalLabelFull}`}>
                     Password <span className={styles.required}>*</span>
-                    <input
-                      className={styles.modalInput}
-                      type="password"
-                      value={userForm.password}
-                      onChange={(e) => updateUserForm('password', e.target.value)}
-                      placeholder="Minimum 6 characters"
-                      required
-                    />
+                    <div className={styles.passwordField}>
+                      <input
+                        className={styles.passwordInput}
+                        type={showUserPassword ? 'text' : 'password'}
+                        value={userForm.password}
+                        onChange={(e) => updateUserForm('password', e.target.value)}
+                        placeholder="Minimum 6 characters"
+                        required
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        className={styles.togglePasswordBtn}
+                        onClick={() => setShowUserPassword((prev) => !prev)}
+                        title={showUserPassword ? 'Hide password' : 'Show password'}
+                        aria-label={showUserPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showUserPassword ? (
+                          <EyeOffIcon width={18} height={18} />
+                        ) : (
+                          <EyeIcon width={18} height={18} />
+                        )}
+                      </button>
+                    </div>
                   </label>
                 </div>
               </div>

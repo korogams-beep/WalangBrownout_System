@@ -34,6 +34,41 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * Extracts a human-readable error message from an Axios error response,
+ * accommodating Laravel's RFC 7807 error envelope { error: { message, fields } }
+ * as well as standard Laravel validation errors { message, errors }.
+ */
+export function getApiErrorMessage(err, fallback = 'An unexpected error occurred.') {
+  if (!err) return fallback;
+  const res = err.response;
+  if (!res) {
+    if (err.code === 'ERR_NETWORK') return 'Cannot connect to server. Please check your internet connection.';
+    return err.message || fallback;
+  }
+  const data = res.data;
+  // 1. Validation fields from RFC 7807 envelope
+  if (data?.error?.fields && typeof data.error.fields === 'object') {
+    const firstField = Object.values(data.error.fields)[0];
+    if (Array.isArray(firstField) && firstField[0]) return firstField[0];
+  }
+  // 2. Standard Laravel validation errors object
+  if (data?.errors && typeof data.errors === 'object') {
+    const firstField = Object.values(data.errors)[0];
+    if (Array.isArray(firstField) && firstField[0]) return firstField[0];
+  }
+  // 3. RFC 7807 error message
+  if (data?.error?.message) return data.error.message;
+  // 4. Standard Laravel message
+  if (data?.message) return data.message;
+  // 5. HTTP status code fallbacks
+  if (res.status === 401) return 'Session expired or unauthenticated. Please log in again.';
+  if (res.status === 403) return 'You do not have permission to perform this action.';
+  if (res.status === 404) return 'The requested resource was not found.';
+  if (res.status === 422) return 'Invalid input data provided.';
+  return fallback;
+}
+
 // ---------------------------------------------------------------------------
 // ISSUE-003 fix: data normalisation adapter
 //
@@ -211,13 +246,16 @@ export async function apiGetUsers() {
  * Admin creates a new user account in MySQL.
  */
 export async function apiCreateUser(payload) {
-  const { data } = await api.post('/users', {
-    name: payload.username || payload.name,
-    email: payload.email,
+  const body = {
+    name: (payload.username || payload.name || '').trim(),
     password: payload.password,
-    role: payload.role,
+    role: payload.role || 'staff',
     active: payload.active ?? true,
-  });
+  };
+  if (payload.email && payload.email.trim()) {
+    body.email = payload.email.trim();
+  }
+  const { data } = await api.post('/users', body);
   return normaliseUser(data.data ?? data);
 }
 
