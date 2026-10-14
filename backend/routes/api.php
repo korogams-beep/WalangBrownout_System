@@ -19,6 +19,20 @@ use App\Http\Controllers\Api\v1\ReorderAlertController;
 Route::prefix('v1')->group(function () {
 
     // -------------------------------------------------------------------------
+    // PUBLIC — Health Check & Deployment Verification
+    // -------------------------------------------------------------------------
+    Route::get('/health', function () {
+        return response()->json([
+            'status' => 'ok',
+            'app' => 'Walang Brownout Appliances API',
+            'version' => '1.0.0',
+            'environment' => app()->environment(),
+            'database' => \Illuminate\Support\Facades\DB::connection()->getPdo() ? 'connected' : 'disconnected',
+            'timestamp' => now()->toIso8601String(),
+        ]);
+    });
+
+    // -------------------------------------------------------------------------
     // PUBLIC — Authentication (no token required)
     // -------------------------------------------------------------------------
     Route::prefix('auth')->group(function () {

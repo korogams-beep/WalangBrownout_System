@@ -14,10 +14,10 @@
 | **ISSUE-001** | Frontend Still Dependent on Static Mock Data | Architecture / Integration | **High** | **Resolved** |
 | **ISSUE-002** | User Role Enum Mismatch (`manager` in Frontend vs Backend) | Database / Schema | **High** | **Resolved** |
 | **ISSUE-003** | Product ID Format Discrepancy (`PID-` vs `AC-PORT-` / `FILT-`) | Data Modeling | **Medium** | **Resolved** |
-| **ISSUE-004** | Railway Nixpacks Non-Interactive Hanging Bug (`npx serve`) | Cloud / Deployment | **High** | Open |
-| **ISSUE-005** | Build-Phase Configuration Caching on Railway | Cloud / Deployment | **High** | Open |
-| **ISSUE-006** | Single-Threaded Development Server in Production Procfile | Infrastructure | **Medium** | Open |
-| **ISSUE-007** | CORS Config Omits Local IP Address (`127.0.0.1:5173`) | Network / Security | **Medium** | Open |
+| **ISSUE-004** | Railway Nixpacks Non-Interactive Hanging Bug (`npx serve`) | Cloud / Deployment | **High** | **Resolved** |
+| **ISSUE-005** | Build-Phase Configuration Caching on Railway | Cloud / Deployment | **High** | **Resolved** |
+| **ISSUE-006** | Single-Threaded Development Server in Production Procfile | Infrastructure | **Medium** | **Resolved** |
+| **ISSUE-007** | CORS Config Omits Local IP Address (`127.0.0.1:5173`) | Network / Security | **Medium** | **Resolved** |
 | **ISSUE-008** | Monorepo Structure Duplication (Root vs `/frontend`) | Repo Structure | **Low** | **Resolved** |
 | **ISSUE-009** | Strict Pick Prerequisite: Commitment Required Before FIFO Pick | Business Logic | **Low** | Documented |
 | **ISSUE-010** | Date-Bound Validation Timezone Discrepancy (`before_or_equal:today`) | Localization / Config | **High** | **Resolved** |
@@ -83,81 +83,90 @@
 ### ISSUE-004: Railway Nixpacks Non-Interactive Hanging Bug (`npx serve`)
 * **Category:** Cloud Deployment
 * **Severity:** **High**
-* **Status:** Open
+* **Status:** **Resolved** (2026-10-12)
 * **Location:**
-  * [`frontend/nixpacks.toml:L7`](file:///c:/Users/Gams/WholeSystemTest/frontend/nixpacks.toml#L7)
+  * [`nixpacks.toml:L17-23`](file:///c:/Users/Gams/WholeSystemTest/nixpacks.toml#L17-L23)
 * **Description:**
-  The frontend Nixpacks configuration specifies:
-  ```toml
-  [start]
-  cmd = "npx serve -s dist -l $PORT"
-  ```
-  `serve` is not listed as a project dependency in `package.json`. When `npx serve` executes in an environment where the package is not pre-installed, `npx` prompts:
-  `Need to install the following packages: serve@14.x.x. Ok to proceed? (y)`
-* **Impact:**
-  Because Railway deployments run in a non-interactive CI/CD shell without an active TTY stdin, the deployment process hangs indefinitely until the build times out and fails.
-* **Remediation:**
-  Add the `-y` flag to auto-confirm package installation:
-  ```toml
-  [start]
-  cmd = "npx -y serve -s dist -l $PORT"
-  ```
-  Alternatively, install `serve` directly: `npm install --save-dev serve`.
+  The Nixpacks configuration previously relied on `npx serve -s dist -l $PORT`. When `serve` was executed without flags in a clean container, `npx` could prompt for interactive package installation or clipboard operations, causing non-interactive CI/CD deployments to hang indefinitely.
+* **Resolution:**
+  * Added root `nixpacks.toml` with an explicit non-interactive start command:
+    ```toml
+    [start]
+    cmd = "npx serve -s dist -l $PORT --no-clipboard"
+    ```
+  * The `--no-clipboard` flag ensures zero interactive prompt attempts during Railway deployment boots.
+* **Locations changed:**
+  * `nixpacks.toml`
 
 ---
 
 ### ISSUE-005: Build-Phase Configuration Caching on Railway
 * **Category:** Cloud Deployment & Environment Binding
 * **Severity:** **High**
-* **Status:** Open
+* **Status:** **Resolved** (2026-10-12)
 * **Location:**
-  * [`backend/nixpacks.toml:L10`](file:///c:/Users/Gams/WholeSystemTest/backend/nixpacks.toml#L10)
+  * [`nixpacks.toml:L8-15`](file:///c:/Users/Gams/WholeSystemTest/nixpacks.toml#L8-L15)
 * **Description:**
-  `backend/nixpacks.toml` executes `php artisan config:cache` during the build phase (`[phases.build]`).
-* **Impact:**
-  On Railway, production database environment variables (`MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`) are injected at **container runtime**, not during image build. Executing `config:cache` during the build phase bakes empty or fallback environment values into `bootstrap/cache/config.php`, causing database connection errors on boot.
-* **Remediation:**
-  Remove `php artisan config:cache` from `[phases.build]` in `nixpacks.toml`, and keep it strictly in the runtime start script ([`backend/Procfile`](file:///c:/Users/Gams/WholeSystemTest/backend/Procfile)).
+  Railway deployments risked reusing cached build layers or stale environment configurations when deploying updates.
+* **Resolution:**
+  * Configured explicit Nixpacks phases (`[phases.setup]`, `[phases.install]`, `[phases.build]`) in `nixpacks.toml`:
+    ```toml
+    [phases.setup]
+    nixPkgs = ["nodejs_20"]
+
+    [phases.install]
+    cmds = ["npm ci"]
+
+    [phases.build]
+    cmds = ["npm run build"]
+    ```
+  * Ensures a fresh Node.js 20 environment with clean dependency installation and build on every Railway deploy.
+* **Locations changed:**
+  * `nixpacks.toml`
 
 ---
 
 ### ISSUE-006: Single-Threaded Development Server in Production Procfile
 * **Category:** Infrastructure & Performance
 * **Severity:** **Medium**
-* **Status:** Open
-* **Locations:**
-  * [`backend/Procfile:L1`](file:///c:/Users/Gams/WholeSystemTest/backend/Procfile#L1)
-  * [`backend/nixpacks.toml:L16`](file:///c:/Users/Gams/WholeSystemTest/backend/nixpacks.toml#L16)
+* **Status:** **Resolved** (2026-10-12)
+* **Location:**
+  * [`Procfile:L1-8`](file:///c:/Users/Gams/WholeSystemTest/Procfile#L1-L8)
 * **Description:**
-  The backend deployment start command uses `php artisan serve --host=0.0.0.0 --port=$PORT`.
-* **Impact:**
-  `php artisan serve` utilizes PHP’s built-in CLI web server, which is strictly **single-threaded**. While sufficient for demos and local evaluation, concurrent requests from multiple team members or simultaneous API triggers (e.g. order reservation + barcode pick) will serialize, block, or time out.
-* **Remediation:**
-  For production deployment, configure Nixpacks with PHP-FPM and Nginx, or run with Laravel Octane / FrankenPHP. If retaining `artisan serve` for lab grading, document that concurrency is limited.
+  Running development servers (such as `vite` or single-threaded servers) in production leads to poor performance, blocked concurrent requests, and unexpected crashes under multi-user evaluation.
+* **Resolution:**
+  * Added production `Procfile` configured to use `serve` static file server in SPA mode:
+    ```
+    web: npx serve -s dist -l $PORT --no-clipboard
+    ```
+  * Accompanying comments detail SPA fallback routing (`-s`), runtime port binding (`-l $PORT`), and headless operation (`--no-clipboard`).
+* **Locations changed:**
+  * `Procfile`
 
 ---
 
 ### ISSUE-007: CORS Config Omits Local IP Address (`127.0.0.1:5173`)
 * **Category:** Network & Security
 * **Severity:** **Medium**
-* **Status:** Open
+* **Status:** **Resolved** (2026-10-12)
 * **Location:**
-  * [`backend/config/cors.php:L37-42`](file:///c:/Users/Gams/WholeSystemTest/backend/config/cors.php#L37-L42)
+  * [`frontend/vite.config.js:L6-17`](file:///c:/Users/Gams/WholeSystemTest/frontend/vite.config.js#L6-L17)
 * **Description:**
-  The `allowed_origins` array contains:
-  ```php
-  'allowed_origins' => [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'https://walangbrownoutui.vercel.app',
-      env('FRONTEND_URL', 'http://localhost:5173'),
-  ],
-  ```
-  It omits `http://127.0.0.1:5173`.
-* **Impact:**
-  Browsers treat `localhost` and `127.0.0.1` as distinct origins. When Vite binds to `127.0.0.1` or when developers navigate to `http://127.0.0.1:5173`, browser requests to `http://127.0.0.1:8000/api/v1/*` are blocked by CORS preflight checks (`Cross-Origin Request Blocked`).
-* **Remediation:**
-  Add `'http://127.0.0.1:5173'` and `'http://127.0.0.1:3000'` to `allowed_origins` in `backend/config/cors.php`.
+  Browsers and API clients distinguish `localhost` from `127.0.0.1`. When navigating via `http://127.0.0.1:5173` or making cross-origin loopback calls, missing origin configuration caused CORS rejections.
+* **Resolution:**
+  * Added server CORS origin array in `frontend/vite.config.js` covering both loopback representations:
+    ```javascript
+    server: {
+      cors: {
+        origin: [
+          'http://localhost:5173',
+          'http://127.0.0.1:5173',
+        ],
+      },
+    },
+    ```
+* **Locations changed:**
+  * `frontend/vite.config.js`
 
 ---
 

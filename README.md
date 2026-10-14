@@ -24,13 +24,25 @@ Walang-Brownout-Appliances-Folder-Structure/
 │   ├── composer.json       # PHP dependencies
 │   └── nixpacks.toml       # Railway deployment config
 │
+├── Docs Files/             # Project documentation and specifications
+│   ├── Guide-Deployment.md # Step-by-step Railway & MySQL deployment guide
+│   ├── Demo-Accounts.md    # Pre-configured demo & production user credentials
+│   ├── Testing-Report.md   # Comprehensive full-stack testing report & audit logs
+│   ├── Issues.md           # Technical debt & issue registry
+│   ├── REVISION-UI.md      # UI revision documentation
+│   ├── Report-Change.md    # Change log report
+│   └── Report-Changes2.md  # Full architecture and specification document
+│
 ├── test-api.ps1            # Automated REST API test suite (30 end-to-end checks)
-├── Testing-Report.md       # Comprehensive full-stack testing report & audit logs
-├── Issues.md               # Technical debt & issue registry
-├── REVISION-UI.md          # UI revision documentation
-├── Report-Change.md        # Change log report
-└── Report-Changes2.md      # Full architecture and specification document
+└── README.md               # Quick start & repository overview
 ```
+
+---
+
+## 🚀 Deployment Guide (Railway & MySQL)
+
+For step-by-step instructions on deploying the MySQL database, Laravel backend, and React frontend to **Railway**, see:
+👉 **[`Docs Files/Guide-Deployment.md`](Docs%20Files/Guide-Deployment.md)**
 
 ---
 
