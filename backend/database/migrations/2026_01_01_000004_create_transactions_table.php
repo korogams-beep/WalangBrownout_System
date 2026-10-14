@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (Schema::hasTable('transactions')) {
+            return;
+        }
+
         Schema::create('transactions', function (Blueprint $table) {
             $table->uuid('transaction_id')->primary();
 

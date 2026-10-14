@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (Schema::hasTable('batches')) {
+            return;
+        }
+
         Schema::create('batches', function (Blueprint $table) {
             $table->string('batch_id', 36)->primary();
             $table->string('product_id', 36);

@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (Schema::hasTable('products')) {
+            return;
+        }
+
         Schema::create('products', function (Blueprint $table) {
             $table->string('product_id', 36)->primary(); // e.g. AC-PORT-01, FILT-CARBON-01
             $table->string('name');
