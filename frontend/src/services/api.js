@@ -547,10 +547,11 @@ export async function apiDeleteSupplier(id) {
  * Normalises a batch record from MySQL to frontend camelCase shape.
  */
 export function normaliseBatch(b) {
+  const lotNum = b.batch_number ?? b.batchNumber;
   return {
-    batchId: b.batch_id ?? b.batchId,
+    batchId: lotNum || b.batch_id || b.batchId,
     productId: b.product_id ?? b.productId,
-    batchNumber: b.batch_number ?? b.batchNumber,
+    batchNumber: lotNum || b.batch_id || b.batchId,
     dateReceived: b.date_received ?? b.dateReceived,
     expiryDate: b.expiry_date ?? b.expiryDate,
     quantityReceived: b.quantity_received ?? b.quantityReceived,

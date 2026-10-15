@@ -412,6 +412,14 @@ function reducer(state, action) {
       return { ...state, suppliers: state.suppliers.filter((s) => s.id !== supplierId) };
     }
 
+    case 'SET_SUPPLIERS': {
+      const { suppliers } = action.payload;
+      return {
+        ...state,
+        suppliers: suppliers || state.suppliers,
+      };
+    }
+
     default:
       return state;
   }
@@ -420,45 +428,51 @@ function reducer(state, action) {
 export function InventoryProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, undefined, buildInitialState);
 
+  async function fetchFromMySQL() {
+    try {
+      const [prods, invs, batches, txns, supps] = await Promise.allSettled([
+        apiGetProducts(),
+        apiGetInventory(),
+        apiGetBatches(),
+        apiGetTransactions(),
+        apiGetSuppliers(),
+      ]);
+
+      if (
+        prods.status === 'fulfilled' &&
+        Array.isArray(prods.value) &&
+        prods.value.length > 0
+      ) {
+        dispatch({
+          type: 'SET_DATA_FROM_API',
+          payload: {
+            products: prods.value,
+            inventory: invs.status === 'fulfilled' ? invs.value : null,
+            batches: batches.status === 'fulfilled' ? batches.value : null,
+            transactions: txns.status === 'fulfilled' && Array.isArray(txns.value) ? txns.value : null,
+            suppliers: supps.status === 'fulfilled' && Array.isArray(supps.value) && supps.value.length > 0 ? supps.value : null,
+          },
+        });
+      }
+    } catch (err) {
+      // Keep initial seed if backend API is not yet reachable
+    }
+  }
+
   // Sync live products, inventory, transactions, and suppliers from MySQL API on mount
   useEffect(() => {
-    let mounted = true;
-
-    async function fetchFromMySQL() {
-      try {
-        const [prods, invs, batches, txns, supps] = await Promise.allSettled([
-          apiGetProducts(),
-          apiGetInventory(),
-          apiGetBatches(),
-          apiGetTransactions(),
-          apiGetSuppliers(),
-        ]);
-
-        if (
-          mounted &&
-          prods.status === 'fulfilled' &&
-          Array.isArray(prods.value) &&
-          prods.value.length > 0
-        ) {
-          dispatch({
-            type: 'SET_DATA_FROM_API',
-            payload: {
-              products: prods.value,
-              inventory: invs.status === 'fulfilled' ? invs.value : null,
-              batches: batches.status === 'fulfilled' ? batches.value : null,
-              transactions: txns.status === 'fulfilled' && Array.isArray(txns.value) ? txns.value : null,
-              suppliers: supps.status === 'fulfilled' && Array.isArray(supps.value) && supps.value.length > 0 ? supps.value : null,
-            },
-          });
-        }
-      } catch (err) {
-        // Keep initial seed if backend API is not yet reachable
-      }
-    }
-
     fetchFromMySQL();
+
+    const handleAuthChange = () => {
+      fetchFromMySQL();
+    };
+
+    window.addEventListener('storage', handleAuthChange);
+    window.addEventListener('wb_auth_change', handleAuthChange);
+
     return () => {
-      mounted = false;
+      window.removeEventListener('storage', handleAuthChange);
+      window.removeEventListener('wb_auth_change', handleAuthChange);
     };
   }, []);
 
@@ -575,12 +589,27 @@ export function InventoryProvider({ children }) {
         try {
           const created = await apiCreateSupplier(supplier);
           dispatch({ type: 'ADD_SUPPLIER', payload: { supplier: created } });
+          const fresh = await apiGetSuppliers();
+          if (Array.isArray(fresh) && fresh.length > 0) {
+            dispatch({ type: 'SET_SUPPLIERS', payload: { suppliers: fresh } });
+          }
           return created;
         } catch (err) {
           console.warn('Supplier created locally (MySQL sync warning):', err?.message || err);
           dispatch({ type: 'ADD_SUPPLIER', payload: { supplier } });
         }
       },
+      refreshSuppliers: async () => {
+        try {
+          const fresh = await apiGetSuppliers();
+          if (Array.isArray(fresh) && fresh.length > 0) {
+            dispatch({ type: 'SET_SUPPLIERS', payload: { suppliers: fresh } });
+          }
+        } catch (err) {
+          console.warn('Failed to refresh suppliers:', err);
+        }
+      },
+      refreshData: fetchFromMySQL,
       editSupplier: async (supplier) => {
         dispatch({ type: 'EDIT_SUPPLIER', payload: { supplier } });
         try {

@@ -28,7 +28,7 @@ class BatchSeeder extends Seeder
 
         $batches = [
             [
-                'batch_id'          => Str::uuid()->toString(),
+                'batch_id'          => 'BATCH-CLEAN-2026-001',
                 'product_id'        => 'CLEAN-AC-01',
                 'batch_number'      => 'CLEAN-2026-001',
                 'date_received'     => now()->toDateString(),

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './TransactionDrawer.module.css';
 import FormPanel from './FormPanel.jsx';
 import FormField from '../ui/FormField.jsx';
@@ -16,9 +16,16 @@ const initialForm = {
 };
 
 export default function TransactionDrawer({ open, onClose }) {
-  const { products, suppliers, createTransaction, inventory } = useInventory();
+  const { products, suppliers, createTransaction, inventory, refreshSuppliers } = useInventory();
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState('');
+
+  // Refresh suppliers from MySQL whenever drawer opens so any newly added supplier is available
+  useEffect(() => {
+    if (open && refreshSuppliers) {
+      refreshSuppliers();
+    }
+  }, [open, refreshSuppliers]);
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));

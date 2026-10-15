@@ -45,13 +45,27 @@ Route::prefix('v1')->group(function () {
     });
 
     // -------------------------------------------------------------------------
-    // PUBLIC — Products Catalog (read-only for quick links and public viewing)
+    // PUBLIC READ-ONLY — Products, Inventory, Batches, Suppliers, Transactions
+    // (Allows frontend inventory context to seamlessly initialise live MySQL state for all roles)
     // -------------------------------------------------------------------------
-    Route::get('/products',             [ProductController::class, 'index']);
-    Route::get('/products/{productId}', [ProductController::class, 'show']);
+    Route::get('/products',                   [ProductController::class, 'index']);
+    Route::get('/products/{productId}',       [ProductController::class, 'show']);
+
+    Route::get('/inventory',                  [InventoryController::class, 'index']);
+    Route::get('/inventory/{productId}',       [InventoryController::class, 'show']);
+
+    Route::get('/batches/oldest/{productId}', [BatchController::class, 'getOldestAvailable']);
+    Route::get('/batches',                    [BatchController::class, 'index']);
+    Route::get('/batches/{batchId}',          [BatchController::class, 'show']);
+
+    Route::get('/suppliers',                  [SupplierController::class, 'index']);
+    Route::get('/suppliers/{id}',             [SupplierController::class, 'show']);
+
+    Route::get('/transactions',               [OrderTransactionController::class, 'index']);
+    Route::get('/transactions/{id}',          [OrderTransactionController::class, 'show']);
 
     // -------------------------------------------------------------------------
-    // PROTECTED — All routes below require a valid Sanctum Bearer token
+    // PROTECTED — All mutation routes below require a valid Sanctum Bearer token
     // -------------------------------------------------------------------------
     Route::middleware('auth:sanctum')->group(function () {
 
@@ -74,50 +88,23 @@ Route::prefix('v1')->group(function () {
         Route::put('/products/{productId}',    [ProductController::class, 'update']);
         Route::delete('/products/{productId}', [ProductController::class, 'destroy']);
 
-        // ── Inventory ─────────────────────────────────────────────────────────
-        // GET /api/v1/inventory             → all products with live ATP
-        // GET /api/v1/inventory/{productId} → single product ATP status
-        Route::prefix('inventory')->group(function () {
-            Route::get('/',            [InventoryController::class, 'index']);
-            Route::get('/{productId}', [InventoryController::class, 'show']);
-        });
-
-        // ── Batches (FIFO Lot Tracking) ───────────────────────────────────────
-        // NOTE: getOldestAvailable must be declared BEFORE the {batchId} wildcard
-        //       to prevent Laravel matching "oldest" as a batchId param.
-        //
-        // GET    /api/v1/batches/oldest/{productId} → next FIFO batch to pick
-        // GET    /api/v1/batches                    → all batches (filterable)
-        // POST   /api/v1/batches                    → receive new lot (RECEIVE trigger)
-        // GET    /api/v1/batches/{batchId}           → single batch with history
-        // DELETE /api/v1/batches/{batchId}           → delete exhausted batch
+        // ── Batches Management ────────────────────────────────────────────────
         Route::prefix('batches')->group(function () {
-            Route::get('/oldest/{productId}', [BatchController::class, 'getOldestAvailable']);
-            Route::get('/',                   [BatchController::class, 'index']);
             Route::post('/',                  [BatchController::class, 'store']);
-            Route::get('/{batchId}',          [BatchController::class, 'show']);
             Route::delete('/{batchId}',       [BatchController::class, 'destroy']);
         });
 
-        // ── Suppliers ─────────────────────────────────────────────────────────
-        Route::apiResource('suppliers', SupplierController::class);
+        // ── Suppliers Management ──────────────────────────────────────────────
+        Route::post('/suppliers',             [SupplierController::class, 'store']);
+        Route::put('/suppliers/{id}',          [SupplierController::class, 'update']);
+        Route::delete('/suppliers/{id}',       [SupplierController::class, 'destroy']);
 
-        // ── Transactions (Inventory Triggers) ─────────────────────────────────
-        // POST /api/v1/transactions/commit  → online checkout reservation (ATP check)
-        // POST /api/v1/transactions/pick    → warehouse FIFO barcode scan
-        // POST /api/v1/transactions/adjust  → cycle count reconciliation
-        // GET  /api/v1/transactions         → list all transactions
-        // POST /api/v1/transactions         → create new transaction
-        // GET  /api/v1/transactions/{id}    → get single transaction
-        // PUT  /api/v1/transactions/{id}    → update / advance transaction status
-        // DELETE /api/v1/transactions/{id} → delete transaction
+        // ── Transactions (Inventory Triggers & Mutations) ─────────────────────
         Route::prefix('transactions')->group(function () {
             Route::post('/commit',  [OrderTransactionController::class, 'commitOrder']);
             Route::post('/pick',    [OrderTransactionController::class, 'pickBarcode']);
             Route::post('/adjust',  [OrderTransactionController::class, 'adjustCount']);
-            Route::get('/',         [OrderTransactionController::class, 'index']);
             Route::post('/',        [OrderTransactionController::class, 'store']);
-            Route::get('/{id}',     [OrderTransactionController::class, 'show']);
             Route::put('/{id}',     [OrderTransactionController::class, 'update']);
             Route::delete('/{id}',  [OrderTransactionController::class, 'destroy']);
         });

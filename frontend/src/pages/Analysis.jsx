@@ -128,7 +128,7 @@ export default function Analysis() {
             rows={expiringBatches}
             emptyMessage="No Class C batches currently tracked."
             columns={[
-              { key: 'batchId', header: 'Batch ID' },
+              { key: 'batchId', header: 'Batch ID', render: (r) => r.batchNumber || r.batchId },
               { key: 'productName', header: 'Product', render: (r) => r.product?.name },
               { key: 'expiryDate', header: 'Expiry Date', render: (r) => new Date(r.expiryDate).toLocaleDateString() },
               {

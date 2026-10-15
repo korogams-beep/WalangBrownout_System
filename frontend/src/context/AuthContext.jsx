@@ -148,6 +148,7 @@ export function AuthProvider({ children }) {
               loginTime: new Date().toISOString(),
             };
             setUser(session);
+            window.dispatchEvent(new Event('wb_auth_change'));
             return { ok: true, role: res.user.role };
           }
         } catch (apiErr) {
@@ -261,6 +262,7 @@ export function AuthProvider({ children }) {
           // ignore logout network errors
         }
         setUser(null);
+        window.dispatchEvent(new Event('wb_auth_change'));
       },
 
       /**

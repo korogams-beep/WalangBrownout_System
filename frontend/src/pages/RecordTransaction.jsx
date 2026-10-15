@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FormPanel from '../components/layout/FormPanel.jsx';
 import FormField from '../components/ui/FormField.jsx';
@@ -12,12 +12,17 @@ const initialForm = {
   quantity: '',
   expiryDate: '',
   location: '',
+  supplierId: '',
 };
 
 export default function RecordTransaction() {
   const navigate = useNavigate();
-  const { products, createTransaction } = useInventory();
+  const { products, suppliers, createTransaction, refreshSuppliers } = useInventory();
   const [form, setForm] = useState(initialForm);
+
+  useEffect(() => {
+    if (refreshSuppliers) refreshSuppliers();
+  }, [refreshSuppliers]);
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -25,6 +30,9 @@ export default function RecordTransaction() {
 
   const selectedProduct = products.find((p) => p.id === form.productId);
   const isPerishableOrder = form.type === 'Orders' && selectedProduct?.productClass === 'Class C';
+  const isOrders  = form.type === 'Orders';
+  const isReturns = form.type === 'Returns';
+  const needsSupplier = isOrders || isReturns;
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -33,7 +41,8 @@ export default function RecordTransaction() {
       productId: form.productId,
       qty: Number(form.quantity) || 0,
       expiryDate: isPerishableOrder && form.expiryDate ? new Date(form.expiryDate).toISOString() : undefined,
-      location: form.type === 'Orders' ? form.location : undefined,
+      location: isOrders ? form.location : undefined,
+      supplierId: needsSupplier ? form.supplierId : undefined,
     });
     navigate('/transactions');
   }
@@ -85,6 +94,17 @@ export default function RecordTransaction() {
             required
           />
         </FormField>
+
+        {needsSupplier && (
+          <FormField label="Supplier">
+            <select value={form.supplierId} onChange={(e) => update('supplierId', e.target.value)}>
+              <option value="">Select supplier (optional)</option>
+              {(suppliers || []).map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </FormField>
+        )}
 
         {form.type === 'Orders' && (
           <FormField label="Bin Location">
