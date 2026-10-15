@@ -14,9 +14,20 @@ export default function ProductForm() {
   const navigate = useNavigate();
   const { products, addProduct } = useInventory();
 
-  // Auto-generate the next Product ID instead of asking the user to type one.
-  const nextProductId = useMemo(() => `PID-${String(products.length + 1).padStart(3, '0')}`, [products.length]);
+  // Auto-generate the next Product ID based on highest existing ID
+  const nextProductId = useMemo(() => {
+    let maxNum = products.length;
+    products.forEach((p) => {
+      const match = p.id?.match(/PID-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    return `PID-${String(maxNum + 1).padStart(3, '0')}`;
+  }, [products]);
 
+  const [productIdInput, setProductIdInput] = useState('');
   const [form, setForm] = useState({
     name: '',
     category: '',
@@ -49,8 +60,9 @@ export default function ProductForm() {
 
   function handleSubmit(e) {
     e.preventDefault();
+    const finalId = (productIdInput.trim() || nextProductId).toUpperCase();
     const product = {
-      id: nextProductId,
+      id: finalId,
       name: form.name,
       category: form.category,
       unitPrice: Number(form.unitPrice) || 0,
@@ -135,8 +147,12 @@ export default function ProductForm() {
           </>
         }
       >
-        <FormField label="Product ID (auto-generated)">
-          <input value={nextProductId} disabled />
+        <FormField label="Product ID (Auto or Custom)">
+          <input
+            value={productIdInput || nextProductId}
+            onChange={(e) => setProductIdInput(e.target.value.toUpperCase())}
+            placeholder={nextProductId}
+          />
         </FormField>
         <FormField label="Product Name">
           <input
