@@ -39,11 +39,13 @@ export default function ProductModal({ open, onClose, editProduct = null }) {
 
   const [form, setForm] = useState(initialForm);
   const [productIdInput, setProductIdInput] = useState('');
+  const [error, setError] = useState('');
   const [justSaved, setJustSaved] = useState(null);
 
   // Pre-fill form when opening in edit mode
   useEffect(() => {
     if (open) {
+      setError('');
       if (isEditMode) {
         setForm({
           name: editProduct.name || '',
@@ -55,11 +57,11 @@ export default function ProductModal({ open, onClose, editProduct = null }) {
         setProductIdInput(editProduct.id || '');
       } else {
         setForm(initialForm);
-        setProductIdInput('');
+        setProductIdInput(nextProductId);
       }
       setJustSaved(null);
     }
-  }, [open, isEditMode, editProduct]);
+  }, [open, isEditMode, editProduct, nextProductId]);
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -77,33 +79,44 @@ export default function ProductModal({ open, onClose, editProduct = null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perishable]);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (isEditMode) {
-      const updated = {
-        ...editProduct,
-        name: form.name,
-        category: form.category,
-        unitPrice: Number(form.unitPrice) || 0,
-        qtyOnHand: Number(form.startingQty) || 0,
-        warehouse: form.warehouse,
-        shelfLifeMonths: perishable ? (editProduct.shelfLifeMonths || 9) : null,
-      };
-      saveEdit(updated);
-      setJustSaved(updated);
-    } else {
-      const finalId = (productIdInput.trim() || nextProductId).toUpperCase();
-      const product = {
-        id: finalId,
-        name: form.name,
-        category: form.category,
-        unitPrice: Number(form.unitPrice) || 0,
-        qtyOnHand: Number(form.startingQty) || 0,
-        warehouse: form.warehouse,
-        shelfLifeMonths: perishable ? 9 : null,
-      };
-      addProduct(product);
-      setJustSaved(product);
+    setError('');
+    const finalId = (productIdInput.trim() || nextProductId).toUpperCase();
+
+    if (!isEditMode && products.some((p) => p.id?.toUpperCase() === finalId)) {
+      setError(`A product with ID "${finalId}" already exists. Please choose a unique ID.`);
+      return;
+    }
+
+    try {
+      if (isEditMode) {
+        const updated = {
+          ...editProduct,
+          name: form.name.trim(),
+          category: form.category,
+          unitPrice: Number(form.unitPrice) || 0,
+          qtyOnHand: Number(form.startingQty) || 0,
+          warehouse: form.warehouse,
+          shelfLifeMonths: perishable ? (editProduct.shelfLifeMonths || 9) : null,
+        };
+        await saveEdit(updated);
+        setJustSaved(updated);
+      } else {
+        const product = {
+          id: finalId,
+          name: form.name.trim(),
+          category: form.category,
+          unitPrice: Number(form.unitPrice) || 0,
+          qtyOnHand: Number(form.startingQty) || 0,
+          warehouse: form.warehouse,
+          shelfLifeMonths: perishable ? 9 : null,
+        };
+        await addProduct(product);
+        setJustSaved(product);
+      }
+    } catch (err) {
+      setError(err?.message || 'Failed to save product to database.');
     }
   }
 
@@ -195,10 +208,14 @@ export default function ProductModal({ open, onClose, editProduct = null }) {
                 </>
               }
             >
+              {error && <div className={styles.errorMessage}>{error}</div>}
               <FormField label="Product ID (Auto or Custom)">
                 <input
-                  value={isEditMode ? editProduct.id : (productIdInput || nextProductId)}
-                  onChange={(e) => setProductIdInput(e.target.value.toUpperCase())}
+                  value={isEditMode ? editProduct.id : productIdInput}
+                  onChange={(e) => {
+                    setError('');
+                    setProductIdInput(e.target.value.toUpperCase());
+                  }}
                   placeholder={nextProductId}
                   disabled={isEditMode}
                 />

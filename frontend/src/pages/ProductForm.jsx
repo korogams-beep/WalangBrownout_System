@@ -28,6 +28,7 @@ export default function ProductForm() {
   }, [products]);
 
   const [productIdInput, setProductIdInput] = useState('');
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
     name: '',
     category: '',
@@ -36,6 +37,12 @@ export default function ProductForm() {
     warehouse: 'Main Warehouse',
   });
   const [justAdded, setJustAdded] = useState(null);
+
+  useEffect(() => {
+    if (!productIdInput) {
+      setProductIdInput(nextProductId);
+    }
+  }, [nextProductId]);
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -58,21 +65,32 @@ export default function ProductForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perishable]);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    setError('');
     const finalId = (productIdInput.trim() || nextProductId).toUpperCase();
-    const product = {
-      id: finalId,
-      name: form.name,
-      category: form.category,
-      unitPrice: Number(form.unitPrice) || 0,
-      qtyOnHand: Number(form.startingQty) || 0,
-      warehouse: form.warehouse,
-      shelfLifeMonths: perishable ? 9 : null,
-    };
 
-    addProduct(product);
-    setJustAdded(product);
+    if (products.some((p) => p.id?.toUpperCase() === finalId)) {
+      setError(`A product with ID "${finalId}" already exists. Please choose a unique ID.`);
+      return;
+    }
+
+    try {
+      const product = {
+        id: finalId,
+        name: form.name.trim(),
+        category: form.category,
+        unitPrice: Number(form.unitPrice) || 0,
+        qtyOnHand: Number(form.startingQty) || 0,
+        warehouse: form.warehouse,
+        shelfLifeMonths: perishable ? 9 : null,
+      };
+
+      await addProduct(product);
+      setJustAdded(product);
+    } catch (err) {
+      setError(err?.message || 'Failed to save product to database.');
+    }
   }
 
   if (justAdded) {
@@ -147,9 +165,10 @@ export default function ProductForm() {
           </>
         }
       >
+        {error && <div className={styles.errorMessage}>{error}</div>}
         <FormField label="Product ID (Auto or Custom)">
           <input
-            value={productIdInput || nextProductId}
+            value={productIdInput}
             onChange={(e) => setProductIdInput(e.target.value.toUpperCase())}
             placeholder={nextProductId}
           />

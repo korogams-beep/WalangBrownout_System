@@ -4,7 +4,7 @@ import FormPanel from './FormPanel.jsx';
 import FormField from '../ui/FormField.jsx';
 import Button from '../ui/Button.jsx';
 import { useInventory } from '../../context/InventoryContext.jsx';
-import { TRANSACTION_TYPES } from '../../utils/inventoryLogic.js';
+import { TRANSACTION_TYPES, calculateATP } from '../../utils/inventoryLogic.js';
 
 const initialForm = {
   productId: '',
@@ -16,35 +16,62 @@ const initialForm = {
 };
 
 export default function TransactionDrawer({ open, onClose }) {
-  const { products, suppliers, createTransaction } = useInventory();
+  const { products, suppliers, createTransaction, inventory } = useInventory();
   const [form, setForm] = useState(initialForm);
+  const [error, setError] = useState('');
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setError('');
   }
 
   const selectedProduct = products.find((p) => p.id === form.productId);
   const isPerishableOrder = form.type === 'Orders' && selectedProduct?.productClass === 'Class C';
   const isOrders  = form.type === 'Orders';
   const isReturns = form.type === 'Returns';
+  const isSale    = form.type === 'Sale';
   const needsSupplier = isOrders || isReturns;
 
-  function handleSubmit(e) {
+  const atp =
+    form.productId && inventory?.[form.productId]
+      ? calculateATP(inventory[form.productId])
+      : selectedProduct?.qtyOnHand ?? 0;
+
+  async function handleSubmit(e) {
     e.preventDefault();
-    createTransaction({
-      type: form.type,
-      productId: form.productId,
-      qty: Number(form.quantity) || 0,
-      expiryDate: isPerishableOrder && form.expiryDate ? new Date(form.expiryDate).toISOString() : undefined,
-      location: isOrders ? form.location : undefined,
-      supplierId: needsSupplier ? form.supplierId : undefined,
-    });
-    setForm(initialForm);
-    onClose();
+    setError('');
+
+    const qty = Number(form.quantity) || 0;
+    if (qty <= 0) {
+      setError('Quantity must be greater than 0.');
+      return;
+    }
+
+    if (isSale && qty > atp) {
+      setError(`Cannot create Sale for ${qty} units. Only ${atp} units are Available to Promise (ATP).`);
+      return;
+    }
+
+    try {
+      await createTransaction({
+        type: form.type,
+        productId: form.productId,
+        qty,
+        expiryDate: isPerishableOrder && form.expiryDate ? new Date(form.expiryDate).toISOString() : undefined,
+        location: isOrders ? form.location : undefined,
+        supplierId: needsSupplier ? form.supplierId : undefined,
+      });
+      setForm(initialForm);
+      setError('');
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Failed to create transaction.');
+    }
   }
 
   function handleCancel() {
     setForm(initialForm);
+    setError('');
     onClose();
   }
 
@@ -68,6 +95,8 @@ export default function TransactionDrawer({ open, onClose }) {
               </>
             }
           >
+            {error && <div className={styles.errorMessage}>{error}</div>}
+
             {/* Col 1 */}
             <FormField label="Type">
               <select value={form.type} onChange={(e) => update('type', e.target.value)}>
@@ -88,10 +117,16 @@ export default function TransactionDrawer({ open, onClose }) {
             </FormField>
 
             {/* Col 1 */}
-            <FormField label="Quantity">
+            <FormField
+              label={
+                isSale && form.productId
+                  ? `Quantity (Available: ${atp})`
+                  : 'Quantity'
+              }
+            >
               <input
                 type="number"
-                min="0"
+                min="1"
                 value={form.quantity}
                 onChange={(e) => update('quantity', e.target.value)}
                 required

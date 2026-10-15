@@ -31,6 +31,7 @@ import {
   apiCommit,
   apiPick,
   apiReceiveBatch,
+  getApiErrorMessage,
 } from '../services/api.js';
 import {
   classifyProduct,
@@ -486,7 +487,9 @@ export function InventoryProvider({ children }) {
             supplierLeadTimeDays: 14,
           });
         } catch (err) {
-          console.warn('Product saved locally (MySQL sync failed or offline):', err?.message || err);
+          console.warn('Product save failed:', err?.message || err);
+          dispatch({ type: 'DELETE_PRODUCT', payload: { productId: product.id } });
+          throw new Error(getApiErrorMessage(err, 'Failed to save product to database.'));
         }
       },
       deleteProduct: async (productId) => {
@@ -514,22 +517,29 @@ export function InventoryProvider({ children }) {
           });
         } catch (err) {
           console.warn('Product updated locally (MySQL sync failed or offline):', err?.message || err);
+          throw new Error(getApiErrorMessage(err, 'Failed to update product in database.'));
         }
       },
       addReorderRule: (rule) => dispatch({ type: 'ADD_REORDER_RULE', payload: { rule } }),
       regenerateReorderRules: () => dispatch({ type: 'REGENERATE_REORDER_RULES' }),
       createTransaction: async (payload) => {
-        dispatch({ type: 'CREATE_TRANSACTION', payload });
         try {
           const created = await apiCreateTransaction(payload);
+          dispatch({ type: 'CREATE_TRANSACTION', payload: { ...payload, id: created?.id } });
           if (created?.id && created.id !== payload.id) {
             const freshTxns = await apiGetTransactions();
             if (freshTxns?.length) {
               dispatch({ type: 'SET_TRANSACTIONS', payload: { transactions: freshTxns } });
             }
           }
+          return created;
         } catch (err) {
-          console.warn('Transaction created locally (MySQL sync warning):', err?.message || err);
+          console.warn('Transaction creation failed:', err?.message || err);
+          if (err?.code === 'ERR_NETWORK') {
+            dispatch({ type: 'CREATE_TRANSACTION', payload });
+            return;
+          }
+          throw new Error(getApiErrorMessage(err, 'Failed to create transaction in database.'));
         }
       },
       advanceTransaction: async (transactionId) => {

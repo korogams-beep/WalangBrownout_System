@@ -27,6 +27,17 @@
   grid-column: 1 / -1;
 }
 
+.errorMessage {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: #d04040;
+  background: #fff0f0;
+  border: 1px solid #f5c0c0;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }

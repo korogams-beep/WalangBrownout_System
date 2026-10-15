@@ -131,10 +131,18 @@ class OrderTransactionController extends Controller
             default   => 'RECEIVE',
         };
 
-        // If Sale is created at Open, commit inventory
+        // If Sale is created at Open, commit inventory after validating ATP
         if ($type === 'Sale') {
             $inventory = Inventory::where('product_id', $productId)->first();
             if ($inventory) {
+                if ($qty > $inventory->available_to_promise) {
+                    return response()->json([
+                        'error' => [
+                            'code'    => 'INSUFFICIENT_ATP',
+                            'message' => "Requested quantity ({$qty}) exceeds available-to-promise stock ({$inventory->available_to_promise}).",
+                        ],
+                    ], 422);
+                }
                 $inventory->quantity_committed += $qty;
                 $inventory->save();
             }
